@@ -4,7 +4,19 @@
 class Themes
 {
   public:
-    enum Theme { eDark, eLight, eRed };
+    enum Theme {
+    eCleanModern = 0,
+    eRetroTerminal = 1,
+    eNeobrutalist = 2,
+    eOrbitalMission = 3,
+    eAlpineDaylight = 4,
+    eFriendlyMesh = 5,
+
+    // Temporary compatibility aliases while we migrate existing theme code.
+    eDark = eCleanModern,
+    eLight = eRetroTerminal,
+    eRed = eNeobrutalist
+};
 
     static void initStyles(void);
     static enum Theme get(void);
