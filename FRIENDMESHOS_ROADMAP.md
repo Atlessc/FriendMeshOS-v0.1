@@ -1,4 +1,4 @@
-# FriendMeshOS v0.1 — Development Roadmap
+# FriendMeshOS v0.2.1 — Development Roadmap
 
 FriendMeshOS is a LilyGO T-Deck-focused firmware based on the working Meshtastic T-Deck MUI foundation. Its purpose is to combine reliable off-grid Meshtastic communication, Totem Compass-inspired friend navigation, and authorized Marauder-inspired passive RF survey tools in one coherent handheld interface.
 
@@ -38,7 +38,7 @@ This roadmap is the source of truth for project scope, implementation order, vis
 - [x] Verify PlatformIO created `meshtastic-device-ui.pio-link` for the local UI.
 - [x] Rebuild successfully using the vendored UI.
 - [ ] Add a macOS setup section to the README.
-- [ ] Add repeatable build, clean, upload, and serial-monitor commands.
+- [x] Add repeatable build, clean, upload, and serial-monitor commands.
 - [ ] Add a script or Make target for `t-deck-tft` build and upload.
 - [ ] Add a documented recovery procedure using `v0.1.0-baseline`.
 - [ ] Add a safe firmware/config backup guide while keeping secrets out of Git.
@@ -60,14 +60,15 @@ Other board variants do not affect T-Deck firmware size or runtime, so pruning h
 
 ### FriendMeshOS identity
 
-- [ ] Replace user-facing Meshtastic branding with FriendMeshOS where licensing permits.
-- [ ] Add a FriendMeshOS boot logo sized for the 320×240 display.
+- [x] Replace T-Deck startup and primary UI branding with FriendMeshOS where licensing permits.
+- [x] Add a FriendMeshOS boot logo sized for the 320×240 display.
 - [ ] Add FriendMeshOS name and version to the About screen.
-- [ ] Display the upstream Meshtastic base version separately from the FriendMeshOS version.
-- [x] Define the initial semantic version as `0.1.0`.
+- [x] Display the upstream Meshtastic base version separately from the FriendMeshOS version on the startup screen.
+- [x] Define and display the current FriendMeshOS version as `0.2.1`.
 - [ ] Add build metadata without exposing private machine paths.
-- [ ] Create a small FriendMeshOS icon/mark that remains legible at embedded resolutions.
-- [ ] Keep original project attribution visible in About and documentation.
+- [x] Create a small FriendMeshOS icon/mark that remains legible at embedded resolutions.
+- [x] Keep original project attribution visible in documentation.
+- [ ] Keep original project attribution visible in a future About screen.
 
 ### Theme system architecture
 
@@ -98,18 +99,18 @@ Selected themes:
 - [x] Apply the Clean Modern channels, settings, and tab colors.
 - [x] Apply the Clean Modern chat, alert, keyboard, spinner, and table colors.
 - [x] Flash and visually test the initial Clean Modern palette.
-- [ ] Finish the theme-aware `accentColor()` helper.
-- [ ] Finish the theme-aware `mutedColor()` helper.
-- [ ] Replace the hard-coded green `colorMesh` navigation icon color.
-- [ ] Replace other hard-coded UI accent colors with theme tokens where appropriate.
-- [ ] Make disabled navigation icons use the theme-muted color.
+- [x] Finish the theme-aware `accentColor()` helper.
+- [x] Finish the theme-aware `mutedColor()` helper.
+- [x] Replace the hard-coded green `colorMesh` navigation icon color in handwritten runtime navigation.
+- [ ] Classify and replace remaining generated/local hard-coded UI accent colors where appropriate.
+- [x] Make disabled navigation icons use a theme-aware disabled color.
 - [ ] Confirm active, inactive, pressed, focused, and disabled states for every theme.
-- [ ] Update the settings dropdown to show the six FriendMeshOS theme names.
+- [x] Update the settings dropdown to show the six FriendMeshOS theme names.
 - [ ] Persist and restore all six theme values safely.
-- [ ] Add validation that falls back to Clean Modern for an invalid theme value.
+- [x] Add runtime validation that falls back to Clean Modern for an invalid theme value.
 - [ ] Decide whether to formally extend `device_ui.proto` or store FriendMeshOS appearance separately.
 - [ ] Confirm mobile clients do not corrupt unknown FriendMeshOS theme values.
-- [ ] Add live theme switching without requiring a reboot.
+- [x] Implement live theme switching without requiring a reboot.
 - [ ] Add a small theme preview or palette strip to Appearance settings.
 - [ ] Keep the selector usable with touch, trackball, and keyboard navigation.
 
@@ -171,10 +172,10 @@ Selected themes:
 
 ## Navigation and common UI behavior
 
-- [ ] Centralize active, inactive, focused, pressed, disabled, warning, and error colors.
-- [ ] Replace hard-coded `colorMesh` and `colorGray` constants with theme-aware accessors.
-- [ ] Ensure active navigation icons use the selected theme accent.
-- [ ] Ensure inactive navigation icons use the selected theme muted color.
+- [x] Centralize active, inactive, focused, disabled, warning, error, and SOS semantic colors.
+- [x] Replace handwritten runtime navigation uses of `colorMesh` and `colorGray` with theme-aware accessors.
+- [x] Ensure active navigation icons use the selected theme accent.
+- [x] Ensure inactive navigation icons use the selected theme muted color.
 - [ ] Ensure active tab borders and icons use separate semantic tokens if necessary.
 - [ ] Ensure screen changes preserve focus for keyboard/trackball users.
 - [ ] Verify touch calibration survives firmware updates when configuration is preserved.
@@ -332,9 +333,22 @@ Target a reliable 16 or 32 GB FAT32 microSD card initially.
 - [ ] Add incomplete-file recovery after power loss.
 - [ ] Add storage-usage and cleanup controls.
 
+### TFT screenshot capture
+
+- [x] Capture the active LVGL screen as RGB565.
+- [x] Convert captured pixels to a standards-compatible 24-bit BMP.
+- [x] Save sequential `/screenshot_####.bmp` files to the SD card.
+- [x] Trigger capture from the T-Deck keyboard through the input broker.
+- [x] Document the `SYM + P` screenshot shortcut and BMP-to-PNG conversion.
+- [x] Log invalid paths, missing screens, snapshot failures, and file-write failures.
+- [ ] Avoid overwriting earlier screenshots after reboot by scanning for the next available filename.
+- [ ] Physically verify capture on every representative screen and all six themes.
+- [ ] Verify missing, full, corrupt, removed, and read-only SD-card failure behavior.
+
 ## Shared hardware and performance constraints
 
-- [ ] Serialize access to the shared TFT/SX1262/SD SPI bus.
+- [x] Serialize screenshot capture and SD writes with the existing shared TFT SPI lock.
+- [ ] Verify all future storage and radio paths serialize access to the shared TFT/SX1262/SD SPI bus.
 - [ ] Confirm chip-select handling for display, LoRa radio, and SD.
 - [ ] Measure LoRa packet loss during Wi-Fi scans.
 - [ ] Measure LoRa packet loss during BLE scans.
@@ -354,8 +368,8 @@ Target a reliable 16 or 32 GB FAT32 microSD card initially.
 - [x] Six-theme table build passes.
 - [x] Theme-safe recoloring helper build passes.
 - [x] Initial Clean Modern build and flash pass.
-- [ ] Clean Modern hard-coded accent cleanup passes.
-- [ ] All six themes compile with warnings reviewed.
+- [ ] Clean Modern generated/local hard-coded accent cleanup passes.
+- [x] All six theme palettes compile in the `t-deck-tft` build; inherited warnings remain to review.
 - [ ] Clean build succeeds after deleting `.pio`.
 - [ ] Factory binary and normal upload binary are both validated.
 
@@ -388,23 +402,24 @@ Target a reliable 16 or 32 GB FAT32 microSD card initially.
 
 ## Documentation and release
 
-- [ ] Replace the inherited README with a FriendMeshOS-focused README while retaining attribution.
-- [ ] Explain supported hardware and frequency variants.
+- [x] Replace the inherited README with a FriendMeshOS-focused README while retaining attribution.
+- [x] Explain that `t-deck-tft` is the only currently supported FriendMeshOS target.
 - [ ] Document macOS prerequisites and PlatformIO activation.
-- [ ] Document `pio run -e t-deck-tft`.
+- [x] Document `pio run -e t-deck-tft`.
 - [ ] Document USB upload and bootloader recovery.
 - [ ] Document factory-flash versus normal-update behavior.
-- [ ] Document theme selection and theme-development structure.
+- [x] Document the six themes and theme-development structure.
 - [ ] Document Friend Compass limitations and heading sources.
-- [ ] Document RF survey authorization and privacy expectations.
-- [ ] Add screenshots of all six finished themes.
+- [x] Document the current authorized passive RF-survey boundary.
+- [x] Add reference screenshots of all six implemented theme palettes.
+- [ ] Replace reference screenshots if needed after every theme passes full physical qualification.
 - [ ] Add a changelog.
 - [ ] Add issue templates after the repository workflow is settled.
 - [ ] Create a reproducible release build process.
 - [ ] Attach checksums to release firmware.
 - [ ] Tag the first themed checkpoint.
 - [ ] Tag the Compass MVP separately.
-- [ ] Publish `v0.1.0` only after physical-device regression testing.
+- [ ] Publish/tag `v0.2.1` only after physical-device regression testing.
 
 ## Immediate next actions
 
@@ -412,11 +427,12 @@ Target a reliable 16 or 32 GB FAT32 microSD card initially.
 - [x] Replace hard-coded `colorMesh` and `colorGray` uses in `TFTView_320x240.cpp`.
 - [ ] Rebuild and flash Clean Modern.
 - [ ] Verify the active navigation icon is cyan and inactive icons are muted slate.
-- [ ] Search for remaining hard-coded legacy green in the active runtime UI.
-- [ ] Commit the completed Clean Modern palette.
+- [x] Search for remaining hard-coded legacy green and document generated/local overrides requiring classification.
+- [x] Commit the Clean Modern palette and semantic theme foundation.
 - [x] Add the six theme names to the Appearance dropdown.
 - [ ] Implement and test theme persistence/fallback.
-- [ ] Customize Retro Terminal as the second completed theme.
+- [x] Implement initial palettes and geometry for all five optional themes.
+- [ ] Physically qualify Retro Terminal as the second completed theme.
 
 ---
 
@@ -796,7 +812,7 @@ Run every item in the existing Physical device and Failure-state sections. Recor
 - Use checkpoint tags only after their named acceptance gate passes.
 - Keep FriendMeshOS semantic version separate from upstream Meshtastic version.
 - Create release artifacts from a clean, reviewed commit, not an uncommitted working tree.
-- Publish `v0.1.0` only when all v0.1.0-scoped items are checked or explicitly moved to a later-version section with rationale.
+- Publish `v0.2.1` only when all v0.2.1-scoped items are checked or explicitly moved to a later-version section with rationale.
 - Release notes must list supported hardware, upstream base, install/update distinction, known limitations, privacy/authorization warnings, checksums, and recovery link.
 
 ## Continuation protocol for any future Codex session
@@ -830,10 +846,25 @@ Use this session handoff template beneath the milestone log:
 
 ## Milestone log
 
+### 2026-07-11 — v0.2.1 roadmap reconciliation and version update
+
+- Status: COMPLETE FOR TRACKED IMPLEMENTATION; PHYSICAL QUALIFICATION REMAINS OPEN
+- Branch / HEAD: `develop` / `b46102c` before this documentation and version working-tree update
+- Roadmap item(s): reconcile completed branding/theme/screenshot/documentation work and advance FriendMeshOS display version to `0.2.1`
+- Files changed: `FRIENDMESHOS_ROADMAP.md`, `branding/TDECK_STYLING.md`, and `variants/esp32s3/t-deck/platformio.ini`
+- Evidence reviewed: commits `a1df497`, `b7b07f2`, `e3bf674`, and `b46102c`; current theme, branding, boot-loader, screenshot, input, README, and build-target sources
+- Commands run: status/history/source reconciliation, `git diff --check`, and `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`
+- Implemented result: FriendMeshOS branding and live boot version labels, six bounded semantic themes with theme-specific geometry, six-name Appearance dropdown, runtime theme switching, SD-card BMP screenshots, boot-image validation/logging, FriendMeshOS README, and six reference screenshot pairs are present in tracked code
+- Build/test result: the `v0.2.1` display-version build passed and produced normal, factory, LittleFS, ELF, and manifest artifacts; inherited warnings remain
+- Hardware result: not run; this reconciliation did not flash or mutate a device
+- Version decision: `FRIENDMESHOS_VERSION` and documented startup display advance from `0.1.0` to `0.2.1`; the upstream Meshtastic base remains displayed separately
+- Known issues: `.github/copilot-instructions.md` remains absent; generated/local literal colors remain to classify; six-theme persistence through stock-client round trips and exhaustive physical theme/input/SD validation remain open
+- Next action: rebuild `t-deck-tft`, then flash only with operator approval and execute the M1 physical theme/compatibility matrix
+
 ### 2026-07-11 — T-Deck branding and dynamic-theme foundation
 
 - Status: IN PROGRESS
-- Branch / HEAD: `develop` / `a1df497` plus uncommitted branding work
+- Branch / HEAD: historical checkpoint at `develop` / `a1df497` plus then-uncommitted branding work; subsequently committed through `b46102c`
 - Roadmap item(s): T-Deck-only FriendMeshOS identity, startup splash, semantic theme system, and six confirmed designs
 - Files changed: `branding/`, root `README.md`, `variants/esp32s3/t-deck/platformio.ini`, and T-Deck 320×240 paths in the vendored device UI
 - Commands run: asset generator, legacy-color audit, `git diff --check`, and `pio run -e t-deck-tft`

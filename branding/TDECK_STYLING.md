@@ -32,7 +32,7 @@ pointer. It is intentionally independent of any one optional theme.
 - `generate_friendmeshos_assets.py` regenerates the derived PNG and LVGL
   RGB565A8 assets.
 
-The startup screen renders `FriendMeshOS v0.1.0` and the upstream Meshtastic
+The startup screen renders `FriendMeshOS v0.2.1` and the upstream Meshtastic
 base version as live labels over the splash. Those strings are not baked into
 the bitmap.
 
