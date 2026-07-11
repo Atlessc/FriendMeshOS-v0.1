@@ -20,6 +20,8 @@ class Themes
 
     static void initStyles(void);
     static enum Theme get(void);
+    static lv_color_t accentColor(void);
+    static lv_color_t mutedColor(void);
     static void set(enum Theme th);
     static void recolorButton(lv_obj_t *obj, bool enabled, lv_opa_t opa = 255);
     static void recolorImage(lv_obj_t *obj, bool enabled);
