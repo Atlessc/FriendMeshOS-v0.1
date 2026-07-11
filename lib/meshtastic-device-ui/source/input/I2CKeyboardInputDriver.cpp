@@ -6,6 +6,8 @@
 
 #include "indev/lv_indev_private.h"
 
+extern volatile bool screenshotRequested;
+
 I2CKeyboardInputDriver::KeyboardList I2CKeyboardInputDriver::i2cKeyboardList;
 
 I2CKeyboardInputDriver::I2CKeyboardInputDriver(void) {}
@@ -89,11 +91,33 @@ void TDeckKeyboardInputDriver::readKeyboard(uint8_t address, lv_indev_t *indev, 
             data->state = LV_INDEV_STATE_PRESSED;
             ILOG_DEBUG("key press value: %d", (int)keyValue);
 
+            static bool symActive = false;
+
             switch (keyValue) {
+            case 0x40: // SYM
+                symActive = !symActive;
+                keyValue = 0;
+                data->state = LV_INDEV_STATE_RELEASED;
+                break;
+
+            case 0x70: // P
+                if (symActive) {
+                    symActive = false;
+                    screenshotRequested = true;
+                    ILOG_INFO("Screenshot requested from SYM+P");
+                    keyValue = 0;
+                    data->state = LV_INDEV_STATE_RELEASED;
+                }
+                break;
+
             case 0x0D:
                 keyValue = LV_KEY_ENTER;
                 break;
+
             default:
+                if (symActive) {
+                    symActive = false;
+                }
                 break;
             }
         } else {

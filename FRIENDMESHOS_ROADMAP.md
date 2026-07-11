@@ -64,7 +64,7 @@ Other board variants do not affect T-Deck firmware size or runtime, so pruning h
 - [ ] Add a FriendMeshOS boot logo sized for the 320×240 display.
 - [ ] Add FriendMeshOS name and version to the About screen.
 - [ ] Display the upstream Meshtastic base version separately from the FriendMeshOS version.
-- [ ] Define the initial semantic version as `0.1.0`.
+- [x] Define the initial semantic version as `0.1.0`.
 - [ ] Add build metadata without exposing private machine paths.
 - [ ] Create a small FriendMeshOS icon/mark that remains legible at embedded resolutions.
 - [ ] Keep original project attribution visible in About and documentation.
@@ -408,13 +408,13 @@ Target a reliable 16 or 32 GB FAT32 microSD card initially.
 
 ## Immediate next actions
 
-- [ ] Complete `Themes::accentColor()` and `Themes::mutedColor()` declarations and implementations.
-- [ ] Replace hard-coded `colorMesh` and `colorGray` uses in `TFTView_320x240.cpp`.
+- [x] Complete `Themes::accentColor()` and `Themes::mutedColor()` declarations and implementations.
+- [x] Replace hard-coded `colorMesh` and `colorGray` uses in `TFTView_320x240.cpp`.
 - [ ] Rebuild and flash Clean Modern.
 - [ ] Verify the active navigation icon is cyan and inactive icons are muted slate.
 - [ ] Search for remaining hard-coded legacy green in the active runtime UI.
 - [ ] Commit the completed Clean Modern palette.
-- [ ] Add the six theme names to the Appearance dropdown.
+- [x] Add the six theme names to the Appearance dropdown.
 - [ ] Implement and test theme persistence/fallback.
 - [ ] Customize Retro Terminal as the second completed theme.
 
@@ -829,6 +829,19 @@ Use this session handoff template beneath the milestone log:
 ```
 
 ## Milestone log
+
+### 2026-07-11 — T-Deck branding and dynamic-theme foundation
+
+- Status: IN PROGRESS
+- Branch / HEAD: `develop` / `a1df497` plus uncommitted branding work
+- Roadmap item(s): T-Deck-only FriendMeshOS identity, startup splash, semantic theme system, and six confirmed designs
+- Files changed: `branding/`, root `README.md`, `variants/esp32s3/t-deck/platformio.ini`, and T-Deck 320×240 paths in the vendored device UI
+- Commands run: asset generator, legacy-color audit, `git diff --check`, and `pio run -e t-deck-tft`
+- Build/test result: `t-deck-tft` build passed; normal, factory, LittleFS, ELF, and manifest artifacts were produced; inherited warnings remain
+- Hardware result: not run; no flash or device mutation was authorized
+- Decisions made: confirmed themes are #3 default plus #2, #4, #6, #10, and #12; branding is gated by `FRIENDMESHOS_TDECK`; boot uses a static Clean Modern splash with live version labels; runtime styling uses semantic palettes and theme geometry
+- Known issues: generated EEZ local color overrides remain to classify/migrate; six-value persistence across stock mobile-client round trips is unverified; no dedicated About screen exists in the current 320×240 UI; all physical visual/input checks remain open
+- Next action: flash only with operator approval, verify splash/top-bar/theme switching on the development T-Deck, then migrate generated local overrides screen by screen
 
 ### 2026-07-10 — roadmap execution-handbook expansion
 

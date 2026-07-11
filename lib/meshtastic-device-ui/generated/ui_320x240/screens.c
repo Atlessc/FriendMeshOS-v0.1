@@ -1959,7 +1959,7 @@ void create_screen_main_screen() {
                                             lv_obj_set_pos(obj, 0, 0);
                                             lv_obj_set_size(obj, LV_PCT(100), LV_SIZE_CONTENT);
                                             lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
-                                            lv_label_set_text(obj, _("Theme: Dark"));
+                                            lv_label_set_text(obj, _("Theme: Clean Modern Field Tool"));
                                             lv_obj_set_style_text_color(obj, lv_color_hex(0xff606060), LV_PART_MAIN | LV_STATE_DISABLED);
                                             lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                                         }
@@ -2401,7 +2401,7 @@ void create_screen_main_screen() {
                     objects.meshtastic_label = obj;
                     lv_obj_set_pos(obj, 14, 0);
                     lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-                    lv_label_set_text(obj, _("Meshtastic"));
+                    lv_label_set_text(obj, _("FriendMeshOS"));
                     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
                     lv_obj_set_style_text_font(obj, &ui_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
                     lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -3890,7 +3890,10 @@ void create_screen_main_screen() {
                     objects.settings_theme_dropdown = obj;
                     lv_obj_set_pos(obj, 0, 0);
                     lv_obj_set_size(obj, 150, 30);
-                    lv_dropdown_set_options(obj, _("Dark\nLight"));
+                    lv_dropdown_set_options(obj,
+                                            _("Clean Modern Field Tool\nRetro Handheld Terminal\nBold Neobrutalist "
+                                              "Utility\nOrbital Mission Control\nAlpine Daylight Navigator\nFriendly Mesh "
+                                              "Constellation"));
                     add_style_drop_down_style(obj);
                     lv_obj_set_style_align(obj, LV_ALIGN_TOP_MID, LV_PART_MAIN | LV_STATE_DEFAULT);
                     lv_obj_set_style_border_color(obj, lv_color_hex(0xffe0e0e0), LV_PART_MAIN | LV_STATE_DEFAULT);

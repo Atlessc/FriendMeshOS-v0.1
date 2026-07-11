@@ -8,6 +8,9 @@
 #include "comms/PacketServer.h"
 #include "graphics/DeviceScreen.h"
 #include "graphics/driver/DisplayDriverConfig.h"
+#include "graphics/common/SdCard.h"
+#include "graphics/view/TFT/TFTScreenshot.h"
+#include "input/InputBroker.h"
 
 #ifdef ARCH_PORTDUINO
 #include "PortduinoGlue.h"
@@ -15,6 +18,38 @@
 #endif
 
 DeviceScreen *deviceScreen = nullptr;
+
+volatile bool screenshotRequested = false;
+
+class TftScreenshotInputHandler
+{
+  public:
+    CallbackObserver<TftScreenshotInputHandler, const InputEvent *>
+        inputObserver =
+            CallbackObserver<TftScreenshotInputHandler, const InputEvent *>(
+                this,
+                &TftScreenshotInputHandler::handleInputEvent
+            );
+
+    int handleInputEvent(const InputEvent *event)
+    {
+        if (event != nullptr) {
+            LOG_DEBUG(
+                "TFT input event: %d",
+                static_cast<int>(event->inputEvent)
+            );
+        }
+        if (event != nullptr &&
+            event->inputEvent == INPUT_BROKER_SCREENSHOT) {
+            LOG_INFO("Screenshot event received");
+            screenshotRequested = true;
+        }
+
+        return 0;
+    }
+};
+
+static TftScreenshotInputHandler screenshotInputHandler;
 
 #ifndef TFT_TASK_STACK_SIZE
 #define TFT_TASK_STACK_SIZE 16384
@@ -30,9 +65,27 @@ CallbackObserver<DeviceScreen, esp_sleep_wakeup_cause_t> endSleepObserver =
 
 void tft_task_handler(void *param = nullptr)
 {
+    static uint32_t screenshotNumber = 1;
+
     while (true) {
         spiLock->lock();
+
         deviceScreen->task_handler();
+
+        if (screenshotRequested) {
+            screenshotRequested = false;
+
+            char path[48];
+            snprintf(
+                path,
+                sizeof(path),
+                "/screenshot_%04lu.bmp",
+                static_cast<unsigned long>(screenshotNumber++)
+            );
+
+            TFTScreenshot::captureScreen(SDFs, path);
+        }
+
         spiLock->unlock();
         deviceScreen->sleep();
     }
@@ -128,6 +181,10 @@ void tftSetup(void)
 #endif
 
     if (deviceScreen) {
+        if (inputBroker) {
+            screenshotInputHandler.inputObserver.observe(inputBroker);
+        }
+
 #ifdef ARCH_ESP32
         tftSleepObserver.observe(&notifyLightSleep);
         endSleepObserver.observe(&notifyLightSleepEnd);

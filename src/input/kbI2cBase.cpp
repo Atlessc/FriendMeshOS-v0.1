@@ -407,6 +407,16 @@ int32_t KbI2cBase::runOnce()
                     e.kbchar = c;
                 }
                 break;
+            case 0x70: // letter p. Modifier takes a screenshot
+                if (is_sym) {
+                    is_sym = false;
+                    e.inputEvent = INPUT_BROKER_SCREENSHOT;
+                    e.kbchar = 0x00;
+                } else {
+                    e.inputEvent = INPUT_BROKER_ANYKEY;
+                    e.kbchar = c;
+                }
+                break;
             case 0x74: // letter t. if modifier and t pressed call 'tab'
                 if (is_sym) {
                     is_sym = false;
@@ -490,7 +500,7 @@ int32_t KbI2cBase::runOnce()
                 e.inputEvent = INPUT_BROKER_RIGHT;
                 e.kbchar = 0;
                 break;
-            case 0xc: // Modifier key: 0xc is alt+c (Other options could be: 0xea = shift+mic button or 0x4 shift+$(speaker))
+            case 0x40: // Modifier key: 0xc is alt+c (Other options could be: 0xea = shift+mic button or 0x4 shift+$(speaker))
                 // toggle modifiers button.
                 is_sym = !is_sym;
                 e.inputEvent = INPUT_BROKER_ANYKEY;

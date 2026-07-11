@@ -12,6 +12,9 @@
 #include "graphics/map/TileProvider.h"
 #include "graphics/map/URLService.h"
 #include "graphics/view/TFT/Themes.h"
+#if defined(FRIENDMESHOS_TDECK)
+#include "graphics/view/TFT/FriendMeshBranding.h"
+#endif
 #include "images.h"
 #include "input/InputDriver.h"
 #include "lv_i18n.h"
@@ -78,11 +81,10 @@ constexpr lv_color_t colorOrange = LV_COLOR_HEX(0xff8c04);
 constexpr lv_color_t colorYellow = LV_COLOR_HEX(0xdbd251);
 constexpr lv_color_t colorBlueGreen = LV_COLOR_HEX(0x05f6cb);
 constexpr lv_color_t colorBlue = LV_COLOR_HEX(0x436C70);
-constexpr lv_color_t colorGray = LV_COLOR_HEX(0x757575);
 constexpr lv_color_t colorLightGray = LV_COLOR_HEX(0xAAFBFF);
 constexpr lv_color_t colorMidGray = LV_COLOR_HEX(0x808080);
 constexpr lv_color_t colorDarkGray = LV_COLOR_HEX(0x303030);
-constexpr lv_color_t colorMesh = LV_COLOR_HEX(0x67ea94);
+constexpr lv_color_t colorQrBackground = LV_COLOR_HEX(0xf8fafc);
 
 // children index of nodepanel lv objects (see addNode)
 enum NodePanelIdx {
@@ -111,6 +113,11 @@ enum ScrollDirection {
 };
 
 extern const char *firmware_version;
+
+#if defined(FRIENDMESHOS_TDECK)
+#define FRIENDMESHOS_STRINGIFY_INNER(value) #value
+#define FRIENDMESHOS_STRINGIFY(value) FRIENDMESHOS_STRINGIFY_INNER(value)
+#endif
 
 TFTView_320x240 *TFTView_320x240::gui = nullptr;
 lv_obj_t *TFTView_320x240::currentPanel = nullptr;
@@ -171,13 +178,34 @@ void TFTView_320x240::init(IClientBase *client)
 
     ui_init_boot();
     FileLoader::init(&fileSystem);
-    if (!FileLoader::loadBootImage(objects.boot_logo))
+    if (!FileLoader::loadBootImage(objects.boot_logo)) {
+#if defined(FRIENDMESHOS_TDECK)
+        lv_image_set_src(objects.boot_logo, &friendmeshos_mark_image);
+        lv_img_set_zoom(objects.boot_logo, 768);
+#else
         lv_image_set_src(objects.boot_logo, &img_meshtastic_boot_logo_image);
+#endif
+    }
     // if boot logo is too big remove the label and center the image
     lv_obj_update_layout(objects.boot_logo);
     if (lv_obj_get_height(objects.boot_logo) > lv_display_get_vertical_resolution(displaydriver->getDisplay()) / 2) {
         lv_obj_set_pos(objects.boot_logo, 0, 0);
+#if defined(FRIENDMESHOS_TDECK)
+        char version[32];
+        char upstream[32];
+        lv_snprintf(version, sizeof(version), "FriendMeshOS v%s", FRIENDMESHOS_STRINGIFY(FRIENDMESHOS_VERSION));
+        lv_snprintf(upstream, sizeof(upstream), "Meshtastic %s base", firmware_version);
+        lv_label_set_text(objects.meshtastic_url, version);
+        lv_label_set_text(objects.firmware_label, upstream);
+        lv_obj_set_style_text_font(objects.meshtastic_url, &ui_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(objects.meshtastic_url, lv_color_hex(0xff22d3ee), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(objects.firmware_label, lv_color_hex(0xff94a3b8), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_remove_flag(objects.firmware_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(objects.meshtastic_url);
+        lv_obj_move_foreground(objects.firmware_label);
+#else
         lv_obj_add_flag(objects.firmware_label, LV_OBJ_FLAG_HIDDEN);
+#endif
     } else {
         lv_label_set_text(objects.firmware_label, firmware_version);
     }
@@ -234,14 +262,19 @@ bool TFTView_320x240::setupUIConfig(const meshtastic_DeviceUIConfig &uiconfig)
     // TODO: set virtual keyboard according language
     //  setKeyboard(db.uiConfig.language);
 
-    // set theme
-    setTheme(db.uiConfig.theme);
+    // set theme, falling back before any palette indexing
+    const Themes::Theme selectedTheme = Themes::normalize(static_cast<uint32_t>(db.uiConfig.theme));
+    if (static_cast<uint32_t>(selectedTheme) != static_cast<uint32_t>(db.uiConfig.theme)) {
+        db.uiConfig.theme = static_cast<meshtastic_Theme>(selectedTheme);
+        controller->storeUIConfig(db.uiConfig);
+    }
+    setTheme(selectedTheme);
 
     // grey out bell until we got the ringtone (0 = silent)
     Themes::recolorButton(objects.home_bell_button, false);
     Themes::recolorText(objects.home_bell_label, false);
 
-    lv_obj_set_style_bg_img_recolor(objects.home_button, colorMesh, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_img_recolor(objects.home_button, Themes::accentColor(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // set brightness
     if (displaydriver->hasLight())
@@ -355,6 +388,14 @@ void TFTView_320x240::init_screens(void)
     ILOG_DEBUG("init screens...");
     state = MeshtasticView::eInitScreens;
     ui_init();
+#if defined(FRIENDMESHOS_TDECK)
+    lv_image_set_src(objects.meshtastic_image, &friendmeshos_mark_image);
+    lv_obj_set_x(objects.meshtastic_image, -78);
+    lv_label_set_text(objects.meshtastic_label, "FriendMeshOS");
+    lv_dropdown_set_options(objects.settings_theme_dropdown,
+                            "Clean Modern Field Tool\nRetro Handheld Terminal\nBold Neobrutalist Utility\nOrbital Mission "
+                            "Control\nAlpine Daylight Navigator\nFriendly Mesh Constellation");
+#endif
     apply_hotfix();
 
     activeMsgContainer = objects.messages_container;
@@ -458,12 +499,11 @@ void TFTView_320x240::ui_set_active(lv_obj_t *b, lv_obj_t *p, lv_obj_t *tp)
 {
     if (activeButton) {
         lv_obj_set_style_border_width(activeButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        if (Themes::get() == Themes::eDark)
-            lv_obj_set_style_bg_img_recolor_opa(activeButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_img_recolor(activeButton, colorGray, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_img_recolor(activeButton, Themes::mutedColor(), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_img_recolor_opa(activeButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     lv_obj_set_style_border_width(b, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_img_recolor(b, colorMesh, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_img_recolor(b, Themes::accentColor(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_img_recolor_opa(b, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     if (activePanel) {
@@ -675,13 +715,12 @@ void TFTView_320x240::updateTheme(void)
     Themes::recolorText(objects.home_sd_card_label, cardDetected);
     Themes::recolorText(objects.home_memory_label, (bool)objects.home_memory_button->user_data);
 
-    lv_opa_t opa = (Themes::get() == Themes::eDark) ? 0 : 255;
-    lv_obj_set_style_bg_img_recolor_opa(objects.home_button, opa, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_img_recolor_opa(objects.nodes_button, opa, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_img_recolor_opa(objects.groups_button, opa, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_img_recolor_opa(objects.messages_button, opa, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_img_recolor_opa(objects.map_button, opa, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_img_recolor_opa(objects.settings_button, opa, LV_PART_MAIN | LV_STATE_DEFAULT);
+    if (activeButton) {
+        lv_obj_set_style_bg_img_recolor(activeButton, Themes::accentColor(), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_img_recolor_opa(activeButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    lv_obj_set_style_image_recolor(objects.meshtastic_image, Themes::accentColor(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_image_recolor_opa(objects.meshtastic_image, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     for (int i = 0; i < c_max_channels; i++) {
         if (db.channel[i].role != meshtastic_Channel_Role_DISABLED)
@@ -1849,7 +1888,8 @@ void TFTView_320x240::ui_event_theme_button(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
     if (event_code == LV_EVENT_CLICKED && THIS->activeSettings == eNone) {
-        lv_dropdown_set_selected(objects.settings_theme_dropdown, THIS->db.uiConfig.theme);
+        lv_dropdown_set_selected(objects.settings_theme_dropdown,
+                                 Themes::normalize(static_cast<uint32_t>(THIS->db.uiConfig.theme)));
         lv_obj_clear_flag(objects.settings_theme_panel, LV_OBJ_FLAG_HIDDEN);
         lv_group_focus_obj(objects.settings_theme_dropdown);
         THIS->disablePanel(objects.controller_panel);
@@ -3712,14 +3752,15 @@ void TFTView_320x240::setBrightness(uint32_t brightness)
  */
 void TFTView_320x240::setTheme(uint32_t value)
 {
-    char buf1[30], buf2[30];
-    lv_dropdown_set_selected(objects.settings_theme_dropdown, value);
+    const Themes::Theme selected = Themes::normalize(value);
+    char buf1[40], buf2[52];
+    lv_dropdown_set_selected(objects.settings_theme_dropdown, selected);
     lv_dropdown_get_selected_str(objects.settings_theme_dropdown, buf1, sizeof(buf1));
     lv_snprintf(buf2, sizeof(buf2), _("Theme: %s"), buf1);
     lv_label_set_text(objects.basic_settings_theme_label, buf2);
 
     // change theme and redraw UI
-    Themes::set(Themes::Theme(value));
+    Themes::set(selected);
     updateTheme();
 }
 
@@ -4060,7 +4101,8 @@ void TFTView_320x240::ui_event_ok(lv_event_t *e)
                 THIS->setTheme(value);
                 THIS->db.uiConfig.theme = meshtastic_Theme(value);
                 THIS->controller->storeUIConfig(THIS->db.uiConfig);
-                lv_obj_set_style_bg_img_recolor(objects.settings_button, colorMesh, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_bg_img_recolor(objects.settings_button, Themes::accentColor(),
+                                                LV_PART_MAIN | LV_STATE_DEFAULT);
             }
 
             lv_obj_add_flag(objects.settings_theme_panel, LV_OBJ_FLAG_HIDDEN);
@@ -5682,7 +5724,7 @@ bool TFTView_320x240::applyNodesFilter(uint32_t nodeNum, bool reset)
         if (name[0] != '\0') {
             if (strcasestr(lv_label_get_text(panel->LV_OBJ_IDX(node_lbl_idx)), name) ||
                 strcasestr(lv_label_get_text(panel->LV_OBJ_IDX(node_lbs_idx)), name)) {
-                lv_obj_set_style_border_color(panel, colorMesh, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_border_color(panel, Themes::focusColor(), LV_PART_MAIN | LV_STATE_DEFAULT);
                 highlight = true;
             }
         }
@@ -6890,7 +6932,7 @@ void TFTView_320x240::hideKeyboard(lv_obj_t *panel)
 
 lv_obj_t *TFTView_320x240::showQrCode(lv_obj_t *parent, const char *data)
 {
-    lv_color_t bg_color = colorMesh;
+    lv_color_t bg_color = colorQrBackground;
     lv_color_t fg_color = lv_palette_darken(LV_PALETTE_BLUE, 4);
     qr = lv_qrcode_create(parent);
     int32_t size = std::min<int32_t>(lv_obj_get_width(parent), lv_obj_get_height(parent)) - 8;
@@ -7376,7 +7418,7 @@ void TFTView_320x240::task_handler(void)
                 if (startTime) {
                     if (curtime - startTime > 30) {
                         lv_label_set_text(objects.trace_route_start_label, _("Start"));
-                        lv_obj_set_style_outline_color(objects.trace_route_start_button, colorMesh,
+                        lv_obj_set_style_outline_color(objects.trace_route_start_button, Themes::accentColor(),
                                                        LV_PART_MAIN | LV_STATE_DEFAULT);
                         removeSpinner();
                     } else {

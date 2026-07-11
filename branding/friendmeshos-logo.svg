@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160" role="img" aria-labelledby="title desc">
+  <title id="title">FriendMeshOS logo</title>
+  <desc id="desc">Three connected mesh nodes surrounding a navigation pointer, followed by the FriendMeshOS wordmark.</desc>
+  <g fill="none" stroke="#22D3EE" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M76 28 30 118h92z"/>
+    <circle cx="76" cy="28" r="14" fill="#07111F"/>
+    <circle cx="30" cy="118" r="14" fill="#07111F"/>
+    <circle cx="122" cy="118" r="14" fill="#07111F"/>
+  </g>
+  <path d="m76 55-18 50 18-12 18 12z" fill="#22D3EE"/>
+  <text x="164" y="103" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="700">FriendMeshOS</text>
+</svg>

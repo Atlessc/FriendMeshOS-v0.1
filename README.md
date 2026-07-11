@@ -1,39 +1,57 @@
-<div align="center" markdown="1">
+# FriendMeshOS
 
-<img src=".github/meshtastic_logo.png" alt="Meshtastic Logo" width="80"/>
-<h1>Meshtastic Firmware</h1>
+FriendMeshOS is experimental LilyGO T-Deck firmware built on Meshtastic
+`v2.7.26.54e0d8d`. Its goal is a coherent handheld for off-grid mesh
+communication, friend navigation, and authorized passive RF surveying.
 
-![GitHub release downloads](https://img.shields.io/github/downloads/meshtastic/firmware/total)
-[![CI](https://img.shields.io/github/actions/workflow/status/meshtastic/firmware/main_matrix.yml?branch=master&label=actions&logo=github&color=yellow)](https://github.com/meshtastic/firmware/actions/workflows/ci.yml)
-[![CLA assistant](https://cla-assistant.io/readme/badge/meshtastic/firmware)](https://cla-assistant.io/meshtastic/firmware)
-[![Fiscal Contributors](https://opencollective.com/meshtastic/tiers/badge.svg?label=Fiscal%20Contributors&color=deeppink)](https://opencollective.com/meshtastic/)
-[![Vercel](https://img.shields.io/static/v1?label=Powered%20by&message=Vercel&style=flat&logo=vercel&color=000000)](https://vercel.com?utm_source=meshtastic&utm_campaign=oss)
+The only current FriendMeshOS target is:
 
-<a href="https://trendshift.io/repositories/5524" target="_blank"><img src="https://trendshift.io/api/badge/repositories/5524" alt="meshtastic%2Ffirmware | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+```bash
+pio run -e t-deck-tft
+```
 
-</div>
+Other inherited Meshtastic board definitions remain in the repository, but
+they are not FriendMeshOS-supported targets and are not part of current UI
+qualification.
 
-</div>
+## Current focus
 
-<div align="center">
-	<a href="https://meshtastic.org">Website</a>
-	-
-	<a href="https://meshtastic.org/docs/">Documentation</a>
-</div>
+- FriendMeshOS identity, startup splash, versioning, and attribution.
+- Six dynamic T-Deck themes, with **#3 Clean Modern Field Tool** as default.
+- Preservation of ordinary Meshtastic messaging, positioning, and phone
+  interoperability.
+- Friend Compass only after the branding/theme and compatibility gates pass.
 
-## Overview
+See [FRIENDMESHOS_ROADMAP.md](FRIENDMESHOS_ROADMAP.md) for the execution plan
+and [branding/TDECK_STYLING.md](branding/TDECK_STYLING.md) for the active visual
+contract and known unfinished styling work.
 
-This repository contains the official device firmware for Meshtastic, an open-source LoRa mesh networking project designed for long-range, low-power communication without relying on internet or cellular infrastructure. The firmware supports various hardware platforms, including ESP32, nRF52, RP2040/RP2350, and Linux-based devices.
+## Branding assets
 
-Meshtastic enables text messaging, location sharing, and telemetry over a decentralized mesh network, making it ideal for outdoor adventures, emergency preparedness, and remote operations.
+Regenerate the T-Deck splash and embedded mark with Pillow installed:
 
-### Get Started
+```bash
+python3 branding/generate_friendmeshos_assets.py
+pio run -e t-deck-tft
+```
 
-- 🔧 **[Building Instructions](https://meshtastic.org/docs/development/firmware/build)** – Learn how to compile the firmware from source.
-- ⚡ **[Flashing Instructions](https://meshtastic.org/docs/getting-started/flashing-firmware/)** – Install or update the firmware on your device.
+The build copies `branding/logo_320x240.png` into the T-Deck LittleFS image as
+`/boot/logo.png`.
 
-Join our community and help improve Meshtastic! 🚀
+## Project status
 
-## Stats
+This is development firmware. A successful build does not establish that the
+startup splash, every theme state, touch, keyboard, trackball, GPS, Bluetooth,
+or LoRa behavior has passed physical regression testing. Consult the roadmap
+milestone log for current evidence.
 
-![Alt](https://repobeats.axiom.co/api/embed/8025e56c482ec63541593cc5bd322c19d5c0bdcf.svg "Repobeats analytics image")
+## Upstream and licensing
+
+FriendMeshOS remains based on and interoperable with the Meshtastic firmware
+project. Meshtastic protocol identifiers and required attribution are retained.
+The repository remains subject to its GPL-3.0 license and applicable vendored
+third-party notices.
+
+Friend Compass is inspired by the friend-navigation product category and does
+not claim Totem Compass protocol compatibility. RF-survey work is limited to
+authorized passive observation in the normal field build.
