@@ -101,6 +101,37 @@ bool FileLoader::loadImage(lv_obj_t *img, const char *path)
 
 bool FileLoader::loadBootImage(lv_obj_t *img)
 {
+    if (_fs == nullptr) {
+        ILOG_ERROR("Boot image filesystem is not initialized");
+        return false;
+    }
+
+    File file = _fs->open("/boot/logo.png", FILE_READ);
+
+    if (!file) {
+        ILOG_ERROR("Boot image not found: /boot/logo.png");
+        return false;
+    }
+
+    const size_t fileSize = file.size();
+    file.close();
+
+    ILOG_INFO(
+        "Boot image found: /boot/logo.png (%u bytes)",
+        static_cast<unsigned>(fileSize)
+    );
+
+    if (fileSize == 0) {
+        ILOG_ERROR("Boot image file is empty");
+        return false;
+    }
+
     lv_image_set_src(img, FL_DRIVE_LETTER "/boot/logo.png");
-    return lv_image_get_src((lv_obj_t *)img) != nullptr;
+
+    ILOG_INFO(
+        "Boot image source assigned: %s",
+        FL_DRIVE_LETTER "/boot/logo.png"
+    );
+
+    return true;
 }

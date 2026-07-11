@@ -177,38 +177,146 @@ void TFTView_320x240::init(IClientBase *client)
     MeshtasticView::init(client);
 
     ui_init_boot();
+    // here
     FileLoader::init(&fileSystem);
-    if (!FileLoader::loadBootImage(objects.boot_logo)) {
+
 #if defined(FRIENDMESHOS_TDECK)
-        lv_image_set_src(objects.boot_logo, &friendmeshos_mark_image);
-        lv_img_set_zoom(objects.boot_logo, 768);
-#else
-        lv_image_set_src(objects.boot_logo, &img_meshtastic_boot_logo_image);
-#endif
-    }
-    // if boot logo is too big remove the label and center the image
-    lv_obj_update_layout(objects.boot_logo);
-    if (lv_obj_get_height(objects.boot_logo) > lv_display_get_vertical_resolution(displaydriver->getDisplay()) / 2) {
+
+    const bool bootImageLoaded =
+        FileLoader::loadBootImage(objects.boot_logo);
+
+    /*
+     * The FriendMeshOS PNG is a complete 320x240 splash screen. When it
+     * loads successfully, it should replace the entire inherited Meshtastic
+     * boot layout rather than only replacing the small logo object.
+     */
+    if (bootImageLoaded) {
         lv_obj_set_pos(objects.boot_logo, 0, 0);
-#if defined(FRIENDMESHOS_TDECK)
+        lv_img_set_zoom(objects.boot_logo, 256);
+
+        /*
+         * The full FriendMeshOS splash already contains its own title and
+         * tagline, so hide the inherited Meshtastic boot labels.
+         */
+        lv_obj_add_flag(
+            objects.meshtastic_url,
+            LV_OBJ_FLAG_HIDDEN
+        );
+
+        lv_obj_add_flag(
+            objects.firmware_label,
+            LV_OBJ_FLAG_HIDDEN
+        );
+
+        /*
+         * Keep the full-screen image above the generated boot-screen
+         * background and inherited decorative elements.
+         */
+        lv_obj_move_foreground(objects.boot_logo);
+    } else {
+        /*
+         * Emergency fallback used only when /boot/logo.png cannot be loaded.
+         * This still produces a FriendMeshOS-branded boot screen instead of
+         * returning to the embedded Meshtastic logo.
+         */
+        lv_image_set_src(
+            objects.boot_logo,
+            &friendmeshos_mark_image
+        );
+
+        lv_img_set_zoom(objects.boot_logo, 768);
+
         char version[32];
         char upstream[32];
-        lv_snprintf(version, sizeof(version), "FriendMeshOS v%s", FRIENDMESHOS_STRINGIFY(FRIENDMESHOS_VERSION));
-        lv_snprintf(upstream, sizeof(upstream), "Meshtastic %s base", firmware_version);
-        lv_label_set_text(objects.meshtastic_url, version);
-        lv_label_set_text(objects.firmware_label, upstream);
-        lv_obj_set_style_text_font(objects.meshtastic_url, &ui_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_color(objects.meshtastic_url, lv_color_hex(0xff22d3ee), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_color(objects.firmware_label, lv_color_hex(0xff94a3b8), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_remove_flag(objects.firmware_label, LV_OBJ_FLAG_HIDDEN);
+
+        lv_snprintf(
+            version,
+            sizeof(version),
+            "FriendMeshOS v%s",
+            FRIENDMESHOS_STRINGIFY(FRIENDMESHOS_VERSION)
+        );
+
+        lv_snprintf(
+            upstream,
+            sizeof(upstream),
+            "Meshtastic %s base",
+            firmware_version
+        );
+
+        lv_label_set_text(
+            objects.meshtastic_url,
+            version
+        );
+
+        lv_label_set_text(
+            objects.firmware_label,
+            upstream
+        );
+
+        lv_obj_remove_flag(
+            objects.meshtastic_url,
+            LV_OBJ_FLAG_HIDDEN
+        );
+
+        lv_obj_remove_flag(
+            objects.firmware_label,
+            LV_OBJ_FLAG_HIDDEN
+        );
+
+        lv_obj_set_style_text_font(
+            objects.meshtastic_url,
+            &ui_font_montserrat_14,
+            LV_PART_MAIN | LV_STATE_DEFAULT
+        );
+
+        lv_obj_set_style_text_color(
+            objects.meshtastic_url,
+            lv_color_hex(0x22D3EE),
+            LV_PART_MAIN | LV_STATE_DEFAULT
+        );
+
+        lv_obj_set_style_text_color(
+            objects.firmware_label,
+            lv_color_hex(0x94A3B8),
+            LV_PART_MAIN | LV_STATE_DEFAULT
+        );
+
+        lv_obj_move_foreground(objects.boot_logo);
         lv_obj_move_foreground(objects.meshtastic_url);
         lv_obj_move_foreground(objects.firmware_label);
-#else
-        lv_obj_add_flag(objects.firmware_label, LV_OBJ_FLAG_HIDDEN);
-#endif
-    } else {
-        lv_label_set_text(objects.firmware_label, firmware_version);
     }
+
+#else
+
+    if (!FileLoader::loadBootImage(objects.boot_logo)) {
+        lv_image_set_src(
+            objects.boot_logo,
+            &img_meshtastic_boot_logo_image
+        );
+    }
+
+    lv_obj_update_layout(objects.boot_logo);
+
+    if (
+        lv_obj_get_height(objects.boot_logo) >
+        lv_display_get_vertical_resolution(
+            displaydriver->getDisplay()
+        ) / 2
+    ) {
+        lv_obj_set_pos(objects.boot_logo, 0, 0);
+
+        lv_obj_add_flag(
+            objects.firmware_label,
+            LV_OBJ_FLAG_HIDDEN
+        );
+    } else {
+        lv_label_set_text(
+            objects.firmware_label,
+            firmware_version
+        );
+    }
+
+#endif
 
     time(&lastrun60);
     time(&lastrun10);
