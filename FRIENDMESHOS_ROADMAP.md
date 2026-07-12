@@ -4,6 +4,8 @@ FriendMeshOS is a LilyGO T-Deck-focused firmware based on the working Meshtastic
 
 This roadmap is the source of truth for project scope, implementation order, visual design, testing, and release readiness.
 
+Deep protocol behavior and the required FriendMesh/Totem architecture are documented in [`MESHTASTIC_CORE_AND_FRIENDMESH_ARCHITECTURE.md`](MESHTASTIC_CORE_AND_FRIENDMESH_ARCHITECTURE.md). Core routing, encryption, channel, position, NodeDB, or protobuf work must remain consistent with that handbook.
+
 ## Project principles
 
 - [x] Target the LilyGO T-Deck `t-deck-tft` environment first.
@@ -14,6 +16,11 @@ This roadmap is the source of truth for project scope, implementation order, vis
 - [x] Publish stable version history through the public `main` branch and Git tags.
 - [x] Maintain FriendMeshOS as an independent public repository.
 - [x] Vendor required source instead of depending on Meshtastic Git submodules.
+- [x] Treat FriendMeshOS as a T-Deck-only product fork with freedom to replace the complete on-device UI and workflows.
+- [x] Preserve Meshtastic radio, routing, reliability, encryption, protobuf, and client interoperability as the compatibility boundary.
+- [x] Keep Meshtastic `2.7.26` as the pinned base while allowing reviewed, selectively ported upstream compatibility, reliability, and security updates.
+- [x] Require every upstream adoption to be classified, adapted, tested, and recorded instead of wholesale-merging UI/product changes.
+- [x] Require architecture documentation to separate reusable protocol/service design from T-Deck-specific implementation so other device developers can repeat the approach later.
 - [ ] Preserve all applicable Meshtastic, device-ui, library, and GPL-3.0 notices.
 - [ ] Avoid claiming compatibility with Totem Compass or ESP32 Marauder protocols.
 - [ ] Keep disruptive or active Wi-Fi attack functionality outside the primary field build.
@@ -202,6 +209,11 @@ Selected themes:
 Friend Compass will use Meshtastic node positions. It will not connect to or impersonate Totem Compass devices.
 
 ### Compass MVP
+
+- [x] Document the Meshtastic packet lifecycle, four protocol layers, routing, reliability, encryption, protobuf, NodeDB, position, and FriendMesh architecture.
+- [x] Define closed FriendMesh groups as standard secondary channels with independent random 32-byte PSKs.
+- [x] Define multiple-group membership as local metadata referencing channel indices without duplicating PSKs.
+- [x] Define distance as great-circle distance from standard Position messages and hops as aged packet/traceroute observations.
 
 - [ ] Add a Friend Compass screen to the navigation.
 - [ ] Read the local position from the existing Meshtastic position state.
@@ -845,6 +857,20 @@ Use this session handoff template beneath the milestone log:
 ```
 
 ## Milestone log
+
+### 2026-07-11 — Meshtastic core and FriendMesh protocol architecture
+
+- Status: COMPLETE FOR ARCHITECTURE; IMPLEMENTATION AND PHYSICAL MULTI-NODE VALIDATION REMAIN OPEN
+- Branch / HEAD: `develop` / current working tree based on `b46102c`
+- Roadmap item(s): understand and document Meshtastic layers 1-4, timing, wire framing, routing, reliability, encryption, protobufs, NodeDB, positions, groups, distance, and hop observations before Friend Compass implementation
+- Files changed: `MESHTASTIC_CORE_AND_FRIENDMESH_ARCHITECTURE.md` and `FRIENDMESHOS_ROADMAP.md`
+- Evidence reviewed: pinned firmware radio/router/crypto/channel/NodeDB/position/client sources, vendored protobuf schemas and generated bindings, and official Meshtastic firmware/protobuf/documentation repositories
+- Architecture decision: closed FriendMesh groups use ordinary secondary channels with random 32-byte PSKs; local group metadata references channels and node identities without duplicating keys; group chat and positions remain standard Meshtastic traffic; PKI remains the verified direct-message path
+- Compass decision: distance is great-circle distance from standard positions; hop count is an aged observation from packet metadata or explicit traceroute, not a permanent property of a person
+- Security decision: distinguish AES-CTR channel encryption from X25519-derived AES-256-CCM direct-message PKI and document the lack of cryptographic authentication for group broadcasts
+- Build/test result: documentation-only change; `git diff --check` passed and no firmware build was required
+- Hardware result: not run; no device mutation was needed
+- Next action: implement Phase A protocol observability and pure unit tests before adding persistent FriendMesh group state
 
 ### 2026-07-11 — v0.2.1 roadmap reconciliation and version update
 
