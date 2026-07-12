@@ -6,6 +6,8 @@ This roadmap is the source of truth for project scope, implementation order, vis
 
 Deep protocol behavior and the required FriendMesh/Totem architecture are documented in [`MESHTASTIC_CORE_AND_FRIENDMESH_ARCHITECTURE.md`](MESHTASTIC_CORE_AND_FRIENDMESH_ARCHITECTURE.md). Core routing, encryption, channel, position, NodeDB, or protobuf work must remain consistent with that handbook.
 
+The complete approved FriendMesh product requirements, UX, security state machines, implementation phases, theme gates, tests, and feasibility boundaries are tracked in [`FRIENDMESH_FULL_IMPLEMENTATION_GAME_PLAN.md`](FRIENDMESH_FULL_IMPLEMENTATION_GAME_PLAN.md). That file is the required checklist for all friends/groups work; no FriendMesh feature implementation starts outside a recorded phase there.
+
 ## Project principles
 
 - [x] Target the LilyGO T-Deck `t-deck-tft` environment first.
@@ -200,7 +202,7 @@ Selected themes:
 - [ ] Preserve Wi-Fi client/MQTT functionality when survey mode is inactive.
 - [ ] Preserve traceroute, range test, telemetry, and packet statistics.
 - [ ] Avoid changing the Meshtastic air protocol unless a feature truly requires it.
-- [ ] Use standard text messages for early SOS compatibility.
+- [ ] Use signed FriendMesh events for private SOS state and an explicit standard-text public fallback for outside-help compatibility.
 - [ ] Use `PRIVATE_APP` only for FriendMeshOS-specific structured packets when justified.
 - [ ] Document behavior when FriendMeshOS-specific packets reach stock Meshtastic clients.
 
@@ -254,8 +256,8 @@ Friend Compass will use Meshtastic node positions. It will not connect to or imp
 
 ### SOS behavior
 
-- [ ] Add an SOS action requiring a deliberate hold or confirmation.
-- [ ] Send the initial SOS as a standard private-channel text message.
+- [ ] Add the approved five-second SOS hold and five-second cancel/privacy countdown.
+- [ ] Send private SOS state through the signed FriendMesh envelope and public fallback through standard Meshtastic text only after the approved policy/confirmation.
 - [ ] Include sender identity and position-validity status.
 - [ ] Include coordinates only when permitted by user/channel settings.
 - [ ] Raise an audible/visual alert on receiving SOS.
@@ -857,6 +859,19 @@ Use this session handoff template beneath the milestone log:
 ```
 
 ## Milestone log
+
+### 2026-07-12 — complete FriendMesh product game plan
+
+- Status: COMPLETE FOR REQUIREMENTS AND EXECUTION PLANNING; FEATURE IMPLEMENTATION NOT STARTED
+- Branch / HEAD: `develop` working tree based on the current reviewed FriendMeshOS state
+- Roadmap item(s): convert the complete friends/groups requirements interview into a trackable foundation-to-release implementation plan
+- Files changed: `FRIENDMESH_FULL_IMPLEMENTATION_GAME_PLAN.md`, `MESHTASTIC_CORE_AND_FRIENDMESH_ARCHITECTURE.md`, `FRIENDMESHOS_ROADMAP.md`, and `README.md`
+- Decisions captured: verified one-device identities, signed epoch membership, four groups/eight members, FriendMesh-only application payloads, secure invite/rekey/removal, encrypted history/sync, complete chat/map/navigation/meetup/marker/SOS/Help behavior, SD-only expansions, protected stock-client interoperability, six-theme gates, and feasibility limits
+- Tracking rule: all FriendMesh feature work follows the game plan's master phase tracker; a phase remains unchecked until implementation, automated/physical verification, recovery, documentation, and six-theme evidence are complete
+- Safety result: approved incomplete-firmware warning added to README before feature implementation
+- Build/test result: documentation-only planning; no firmware build required
+- Hardware result: not run; no device mutation was needed
+- Next action: complete Phase 0 wireframes, glossary, decision log, risk register, and upstream-delta ledger before implementing Phase 1
 
 ### 2026-07-11 — Meshtastic core and FriendMesh protocol architecture
 

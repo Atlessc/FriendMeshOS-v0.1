@@ -2,6 +2,13 @@
 
 # FriendMeshOS
 
+> [!WARNING]
+> FriendMeshOS is incomplete development firmware. Group security, history
+> synchronization, emergency alerts, key rotation, location sharing, and
+> Meshtastic interoperability may be unfinished or unsafe. Do not rely on it
+> for emergency communication, personal safety, secure messaging, or
+> production use.
+
 FriendMeshOS is experimental LilyGO T-Deck firmware built on Meshtastic
 `v2.7.26.54e0d8d`. Its goal is a coherent handheld for off-grid mesh
 communication, friend navigation, field utilities, and authorized passive RF
@@ -27,8 +34,10 @@ hardware qualification.
 - Reliable SD-card BMP screenshot capture.
 - Friend Compass only after the branding, theme, and compatibility gates pass.
 
-See [FRIENDMESHOS_ROADMAP.md](FRIENDMESHOS_ROADMAP.md) for the execution plan
-and [branding/TDECK_STYLING.md](branding/TDECK_STYLING.md) for the active visual
+See [FRIENDMESHOS_ROADMAP.md](FRIENDMESHOS_ROADMAP.md) for the whole-project
+roadmap, [FRIENDMESH_FULL_IMPLEMENTATION_GAME_PLAN.md](FRIENDMESH_FULL_IMPLEMENTATION_GAME_PLAN.md)
+for the complete friends/groups execution tracker, and
+[branding/TDECK_STYLING.md](branding/TDECK_STYLING.md) for the active visual
 contract and known unfinished styling work.
 
 ## Themes

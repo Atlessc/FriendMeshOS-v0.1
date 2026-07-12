@@ -2,6 +2,8 @@
 
 This document is the protocol and implementation source of truth for FriendMeshOS work built on the vendored Meshtastic `v2.7.26.54e0d8d` foundation. It explains what makes the current firmware Meshtastic, identifies the exact source anchors, and defines how FriendMesh groups and the Totem-inspired Friend Compass must reuse the protocol without breaking interoperability.
 
+Approved FriendMesh product behavior and implementation order are defined in [`FRIENDMESH_FULL_IMPLEMENTATION_GAME_PLAN.md`](FRIENDMESH_FULL_IMPLEMENTATION_GAME_PLAN.md). This handbook owns the Meshtastic compatibility boundary; the game plan owns the FriendMesh product contract.
+
 It is intentionally deeper than a feature overview. Before changing radio, routing, channel, encryption, NodeDB, position, or protobuf behavior, trace the named source path and update this document when behavior changes.
 
 ## Governing product contract
@@ -332,13 +334,13 @@ PKI provides authenticated encryption of the payload relative to the derived sha
 
 ### Key lifecycle hazards
 
-The private key is persistent device identity. A full factory reset that erases BLE bonds also removes it and generates a new pair. Peers retaining the old public key can no longer decrypt new direct messages until NodeInfo is exchanged. A partial configuration reset preserves it. FriendMeshOS must warn before key rotation and must never rotate keys as part of leaving a group.
+The private key is persistent device identity. A full factory reset that erases BLE bonds also removes it and generates a new pair. Peers retaining the old public key can no longer decrypt new direct messages until NodeInfo is exchanged. A partial configuration reset preserves it. FriendMeshOS must warn before device-identity rotation. Group membership removal is a separate operation and must rotate the affected group's channel PSK so the departing device cannot decrypt future group traffic.
 
 Licensed amateur-radio mode disables channel encryption and PKI behavior as required by the firmware's operating rules. FriendMeshOS must not offer “closed group” claims while licensed mode is active.
 
 ### Key-distribution rule for groups
 
-Group PSKs must be generated with a cryptographically secure RNG and transferred through the existing channel URL/QR/manual import mechanisms or another authenticated out-of-band path. Never derive a group PSK from a group name, PIN, human password, member names, or public channel key. Never write PSKs into FriendMesh group metadata, screenshots, logs, exports, or Git.
+Group PSKs must be generated with a cryptographically secure RNG. FriendMesh admission transfers them only after nearby-code discovery, admin approval, in-person identity verification, and member-specific encrypted key delivery. Never derive a group PSK from a group name, invitation code, PIN, human password, member names, or public channel key. Never write PSKs into FriendMesh group metadata, screenshots, logs, exports, or Git.
 
 ## Protobuf architecture
 
@@ -440,12 +442,12 @@ Use standard Meshtastic constructs:
 - One ordinary primary channel defines the RF parameters.
 - Each closed FriendMesh group maps to one enabled secondary channel.
 - Each group uses a random 32-byte AES-256 PSK.
-- Group chat uses broadcast `TEXT_MESSAGE_APP` on that channel.
-- Group positions use `POSITION_APP` on that channel, respecting its precision.
+- Group chat and structured group events use a versioned FriendMesh application envelope on `PRIVATE_APP` so stock clients do not display group content even if they understand ordinary Meshtastic text.
+- Group location features consume standard Meshtastic position state while FriendMesh-specific sharing/freshness events remain inside the FriendMesh envelope.
 - One person can join multiple groups by enabling multiple secondary channels, subject to the firmware's channel-table capacity.
 - Per-person private messages use standard PKI direct messaging when verified keys are available.
 
-FriendMesh metadata should be a versioned local record containing group ID, display name, color/icon, channel index/reference, ordered member references, favorite targets, UI preferences, and schema version. It must not duplicate PSKs.
+FriendMesh metadata should be a versioned local record containing group ID, display name, channel index/reference, ordered verified device-member records, admin chain/epoch, location policy, meetup state, and schema version. It must not duplicate PSKs into ordinary metadata.
 
 ### Membership semantics
 
@@ -494,7 +496,7 @@ Map markers must be grouped/filterable by FriendMesh group, but a person in seve
 
 ### SOS architecture
 
-The interoperable MVP sends a standard text alert on the selected private group channel with `want_ack` as appropriate. Include sender, timestamp, position availability, and coordinates only when sharing policy permits. `ALERT_APP` can be evaluated for compatible critical-alert presentation, but no custom payload may be the only alert path.
+The group SOS state machine uses the signed FriendMesh application envelope. An explicit public/outside-help fallback sends standard readable Meshtastic text; exact public coordinates require deliberate confirmation. Include sender, timestamp, position validity/age, and coordinates only under the approved privacy policy.
 
 SOS delivery is best effort. Broadcast implicit ACK means a relay was heard, not that every member or emergency service received it. Cancellation and acknowledgment require explicit application state and operation IDs.
 
@@ -526,10 +528,10 @@ These are compatibility boundaries. Build the group and compass experience above
 - Support one node in multiple groups.
 - Handle deleted/evicted NodeDB entries without deleting membership.
 
-### Phase C: standard group chat and joining
+### Phase C: FriendMesh group chat and joining
 
 - Create/import secondary channels through existing config APIs.
-- Bind group chat to standard channel text messages.
+- Bind group chat to the versioned signed FriendMesh application envelope while preserving ordinary Meshtastic text in the separate Meshtastic area.
 - Surface channel capacity and PSK-rotation implications.
 - Test with unmodified Meshtastic nodes and phone clients.
 
@@ -549,9 +551,10 @@ These are compatibility boundaries. Build the group and compass experience above
 
 ### Phase F: SOS and richer metadata
 
-- Ship interoperable standard-text SOS first.
-- Add explicit ACK/cancel state with replay-safe IDs only after the base path is proven.
-- Consider a registered/private protobuf only for additive metadata.
+- Ship the signed FriendMesh incident state machine with replay-safe IDs.
+- Add explicit delivered/responding/unable/arrived/closed states.
+- Preserve deliberate standard-text public fallback for outside-help interoperability.
+- Evaluate a registered upstream port number after the private application envelope is proven.
 
 ## Verification matrix
 
