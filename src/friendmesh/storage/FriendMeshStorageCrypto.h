@@ -5,7 +5,17 @@
 namespace friendmesh::storage
 {
 
-class FriendMeshStorageCrypto final : public StorageAead, public StoragePasswordKdf, public StorageSubkeyKdf
+class StorageRandomSource
+{
+  public:
+    virtual ~StorageRandomSource() = default;
+    virtual bool fill(uint8_t *output, size_t outputSize) const = 0;
+};
+
+class FriendMeshStorageCrypto final : public StorageAead,
+                                      public StoragePasswordKdf,
+                                      public StorageSubkeyKdf,
+                                      public StorageRandomSource
 {
   public:
     bool available() const override;
@@ -20,6 +30,7 @@ class FriendMeshStorageCrypto final : public StorageAead, public StoragePassword
                            uint8_t output[STORAGE_KEY_SIZE]) const override;
     bool deriveStorageSubkey(const uint8_t masterKey[STORAGE_KEY_SIZE], uint64_t subkeyId, const char context[8],
                              uint8_t output[STORAGE_KEY_SIZE]) const override;
+    bool fill(uint8_t *output, size_t outputSize) const override;
     bool randomNonce(uint8_t nonce[STORAGE_NONCE_SIZE]) const;
     bool selfTest() const;
 };

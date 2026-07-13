@@ -1220,7 +1220,13 @@ Build:
 - [x] Freeze and implement the versioned 108-byte wrapped-master-key framing, device-binding AAD contract, bounded pre-KDF validation, and ten fixed storage-domain context/subkey IDs with deterministic host rejection checks.
 - [x] Implement backend-independent two-slot wrapped-key generation selection and the internal LittleFS/SafeFile slot backend without enabling runtime key creation.
 - [x] Add an operator-triggered D-01 key-slot recovery self-test using fixed non-secret material and isolated diagnostic paths with mandatory cleanup; production key paths remain untouched.
-- [ ] Freeze final persisted KDF parameters after transactional wrap recovery and normal UI/radio coexistence validation.
+- [x] Build a separate two-stage D-01 reboot/interrupted-write/credential-rewrap diagnostic action that requires a real reboot, uses only fixed non-secret material and isolated diagnostic paths, rejects the old credential after rewrap, and cleans all artifacts after verification.
+- [x] Freeze the v1 persisted KDF profile at Argon2id 1024 KiB / 3 operations after the physical benchmark, transactional wrapped-key recovery, reboot/interrupted-write rewrap test, and public/direct messaging plus configuration regression passed.
+- [x] Implement a fail-closed 16-byte T-Deck device binding from the factory ESP32-S3 optional unique ID; the raw identifier is never persisted, logged, or exported.
+- [x] Build and physically run an isolated three-stage D-01 binding test across a real reboot and genuinely changed firmware image without constructing production key paths; final screen and three redacted exports pass.
+- [x] Implement and host-check the explicit production storage-key lifecycle manager: dedicated six-digit PIN policy, CSPRNG master-key provisioning, factory-bound two-slot commits, unlock/lock, transactional rewrap, old-PIN rejection, subkey derivation, output wiping, and no silent provisioning or plaintext fallback.
+- [x] Construct the production slot mapping at startup for a read-only presence/availability probe and expose its status/detail in D-01 and exports; no production key, PIN-derived value, signing seed, or storage record is created automatically.
+- [ ] Implement and physically review the T-Deck storage-PIN setup, unlock, change-PIN, lock, and recovery UI before creating the first production master key.
 - [ ] Internal essential store and SD storage provider.
 - [ ] Append-only journal, snapshots, index, compaction, schema migration, transaction recovery.
 - [ ] Capacity accounting and fallback.
@@ -1237,11 +1243,16 @@ Design:
 Tests/gate:
 
 - [x] Host checks cover record and wrapped-key round trips, wrong key/PIN/binding, every-byte mutation, every truncation, excessive-cost rejection before KDF, context mismatch, and stable pairwise-distinct storage subkeys under UB/bounds sanitizers.
+- [x] Host checks prove stable same-ID binding, distinct different-ID binding, invalid/all-zero rejection with output wipe, and authenticated wrong-binding rejection.
 - [x] Fault-injected host checks cover empty slots, alternating generations, partial writes, corrupt readback, wrong PIN, stale generations, peer-slot I/O failure, and same-generation divergent-key quarantine.
+- [x] Host lifecycle checks cover PIN policy, unavailable binding/RNG, explicit-only provisioning, redundant generations, lock/unlock, wrong PIN/binding, subkey derivation, rewrap, old-PIN rejection, and fail-closed partial writes.
 - [x] Build the isolated asynchronous D-01 physical-provider self-test for initial commit, alternating generation, corrupt-old-slot recovery, degraded-state reporting, and test-file cleanup outside the TFT task's `spiLock`-held callback.
 - [x] Physically run and export the corrected isolated D-01 provider test: 5172 ms, generation 2, mask `0x02`, degraded recovery, cleanup pass, and no reboot.
+- [x] Compile and host-check the separate two-stage physical recovery gate; production key paths and identity transmission remain disabled.
 - [x] Run the XChaCha known-answer self-test on physical T-Deck hardware.
-- [ ] Physically validate LittleFS wrapped-key creation, rewrap, corrupt-slot, reboot, and interrupted-write recovery with a non-production test key.
+- [x] Physically validate LittleFS wrapped-key creation, rewrap, corrupt-slot, reboot, and interrupted-write recovery with fixed non-production test material: the normal provider test passed in 5172 ms and the required-reboot stage passed in 8982 ms with old-credential rejection and cleanup.
+- [x] Confirm public messaging, private direct messaging, and configuration loading remain healthy after the two-stage recovery test; BLE concurrency remains outside the approved FriendMesh acceptance scope.
+- [x] Physically complete the staged binding test: Build A, run, real reboot, run, genuinely changed Build B, run, cleanup, and export `PASS`.
 - [ ] Power cut at every transaction boundary.
 - [ ] SD removal/full/corrupt/read-only.
 - [ ] Nonce uniqueness across reboot.

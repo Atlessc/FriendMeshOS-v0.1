@@ -24,7 +24,22 @@ bool friendMeshStorageCryptoReady()
     return friendMeshModule && friendMeshModule->storageCryptoSelfTestPassed();
 }
 
-FriendMeshModule::FriendMeshModule() : SinglePortModule("FriendMesh", meshtastic_PortNum_PRIVATE_APP)
+friendmesh::storage::StorageKeyStatus friendMeshStorageKeyStatus()
+{
+    return friendMeshModule ? friendMeshModule->storageKeyStatus()
+                            : friendmesh::storage::StorageKeyStatus::STORAGE_UNAVAILABLE;
+}
+
+friendmesh::storage::StorageKeyResult friendMeshStorageKeyResult()
+{
+    return friendMeshModule ? friendMeshModule->storageKeyResult()
+                            : friendmesh::storage::StorageKeyResult::STORAGE_UNAVAILABLE;
+}
+
+FriendMeshModule::FriendMeshModule()
+    : SinglePortModule("FriendMesh", meshtastic_PortNum_PRIVATE_APP), wrappedKeyStore(internalKeySlots),
+      storageKeyManager(wrappedKeyStore, internalKeySlots, storageCrypto, storageCrypto, storageCrypto, storageCrypto,
+                        deviceBinding)
 {
     cryptoReady = friendmesh::security::FriendMeshCrypto::selfTest();
     if (!cryptoReady) {
@@ -32,13 +47,16 @@ FriendMeshModule::FriendMeshModule() : SinglePortModule("FriendMesh", meshtastic
     } else {
         LOG_INFO("FriendMesh Ed25519 self-test passed; signed envelope receiver ready");
     }
-    friendmesh::storage::FriendMeshStorageCrypto storageCrypto;
     storageCryptoReady = storageCrypto.selfTest();
     if (storageCryptoReady) {
         LOG_INFO("FriendMesh XChaCha20-Poly1305 storage self-test passed; encrypted record codec ready");
     } else {
         LOG_ERROR("FriendMesh XChaCha20-Poly1305 storage self-test failed; encrypted persistence disabled");
     }
+    const auto keyStatus = storageKeyManager.probe();
+    LOG_INFO("FriendMesh production storage key: %s (%s); no automatic provisioning",
+             friendmesh::storage::FriendMeshStorageKeyManager::statusName(keyStatus),
+             friendmesh::storage::FriendMeshStorageKeyManager::resultName(storageKeyManager.lastResult()));
     const auto identityStatus = signingIdentity.initialize(nullptr);
     LOG_INFO("FriendMesh outbound signing identity: %s; transmit disabled until protected storage is available",
              friendmesh::security::signingIdentityStatusName(identityStatus));

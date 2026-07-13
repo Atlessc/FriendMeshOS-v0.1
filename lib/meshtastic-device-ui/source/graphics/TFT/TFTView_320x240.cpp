@@ -16,7 +16,9 @@
 #include "FSCommon.h"
 #include "friendmesh/FriendMeshStatus.h"
 #include "friendmesh/observability/DiagnosticFormatter.h"
+#include "friendmesh/storage/FriendMeshDeviceBindingTest.h"
 #include "friendmesh/storage/FriendMeshKdfBenchmark.h"
+#include "friendmesh/storage/FriendMeshKeySlotRebootTest.h"
 #include "friendmesh/storage/FriendMeshKeySlotSelfTest.h"
 #include "graphics/view/TFT/FriendMeshBranding.h"
 #include "mesh/Throttle.h"
@@ -867,6 +869,20 @@ void TFTView_320x240::createFriendMeshDiagnostics(void)
     lv_obj_center(friendMeshKeySlotTestButtonLabel);
     lv_label_set_text(friendMeshKeySlotTestButtonLabel, "Run TEST Slot Recovery");
 
+    friendMeshKeySlotRebootTestButton = lv_btn_create(friendMeshDiagnosticsPanel);
+    lv_obj_set_size(friendMeshKeySlotRebootTestButton, LV_PCT(95), 30);
+    add_style_settings_button_style(friendMeshKeySlotRebootTestButton);
+    friendMeshKeySlotRebootTestButtonLabel = lv_label_create(friendMeshKeySlotRebootTestButton);
+    lv_obj_center(friendMeshKeySlotRebootTestButtonLabel);
+    lv_label_set_text(friendMeshKeySlotRebootTestButtonLabel, "Run TEST Reboot/Rewrap");
+
+    friendMeshDeviceBindingTestButton = lv_btn_create(friendMeshDiagnosticsPanel);
+    lv_obj_set_size(friendMeshDeviceBindingTestButton, LV_PCT(95), 30);
+    add_style_settings_button_style(friendMeshDeviceBindingTestButton);
+    friendMeshDeviceBindingTestButtonLabel = lv_label_create(friendMeshDeviceBindingTestButton);
+    lv_obj_center(friendMeshDeviceBindingTestButtonLabel);
+    lv_label_set_text(friendMeshDeviceBindingTestButtonLabel, "Run TEST Device Binding");
+
     friendMeshDiagnosticsDetailButton = lv_btn_create(friendMeshDiagnosticsPanel);
     lv_obj_set_size(friendMeshDiagnosticsDetailButton, LV_PCT(95), 30);
     add_style_settings_button_style(friendMeshDiagnosticsDetailButton);
@@ -1049,6 +1065,10 @@ bool TFTView_320x240::exportFriendMeshDiagnostics(char *path, size_t pathSize)
     file.println(static_cast<unsigned long>(friendMeshDiagnostics.capacity()));
     file.print("generated_at=");
     file.println(static_cast<unsigned long>(VALID_TIME(actTime) ? actTime : 0));
+    file.print("storage_key_status=");
+    file.println(friendmesh::storage::FriendMeshStorageKeyManager::statusName(friendMeshStorageKeyStatus()));
+    file.print("storage_key_detail=");
+    file.println(friendmesh::storage::FriendMeshStorageKeyManager::resultName(friendMeshStorageKeyResult()));
 #if defined(ARDUINO_ARCH_ESP32)
     file.print("heap_free=");
     file.println(static_cast<unsigned long>(ESP.getFreeHeap()));
@@ -1104,6 +1124,44 @@ bool TFTView_320x240::exportFriendMeshDiagnostics(char *path, size_t pathSize)
     file.println(slotTest.degradedRecovery ? "true" : "false");
     file.print("key_slot_self_test_cleanup=");
     file.println(slotTest.cleanupPassed ? "PASS" : "FAIL");
+    const auto rebootTest = friendmesh::storage::keySlotRebootTestSnapshot();
+    file.print("key_slot_reboot_test_state=");
+    file.println(friendmesh::storage::keySlotRebootTestStateName(rebootTest.state));
+    file.print("key_slot_reboot_test_failed_step=");
+    file.println(friendmesh::storage::keySlotRebootTestStepName(rebootTest.failedStep));
+    file.print("key_slot_reboot_test_duration_ms=");
+    file.println(static_cast<unsigned long>(rebootTest.durationMs));
+    file.print("key_slot_reboot_test_generation=");
+    file.println(static_cast<unsigned long>(rebootTest.selectedGeneration));
+    file.print("key_slot_reboot_test_valid_mask=");
+    file.println(static_cast<unsigned>(rebootTest.validMask));
+    file.print("key_slot_reboot_test_interrupted_recovery=");
+    file.println(rebootTest.interruptedWriteRecovered ? "PASS" : "NO");
+    file.print("key_slot_reboot_test_credential_rewrap=");
+    file.println(rebootTest.credentialRewrapPassed ? "PASS" : "NO");
+    file.print("key_slot_reboot_test_old_credential_rejected=");
+    file.println(rebootTest.oldCredentialRejected ? "PASS" : "NO");
+    file.print("key_slot_reboot_test_cleanup=");
+    file.println(rebootTest.cleanupPassed ? "PASS" : "NO");
+    const auto bindingTest = friendmesh::storage::deviceBindingTestSnapshot();
+    file.print("device_binding_test_state=");
+    file.println(friendmesh::storage::deviceBindingTestStateName(bindingTest.state));
+    file.print("device_binding_test_failed_step=");
+    file.println(friendmesh::storage::deviceBindingTestStepName(bindingTest.failedStep));
+    file.print("device_binding_test_duration_ms=");
+    file.println(static_cast<unsigned long>(bindingTest.durationMs));
+    file.print("device_binding_available=");
+    file.println(bindingTest.bindingAvailable ? "PASS" : "NO");
+    file.print("device_binding_same_device=");
+    file.println(bindingTest.sameDevicePassed ? "PASS" : "NO");
+    file.print("device_binding_reboot=");
+    file.println(bindingTest.rebootPassed ? "PASS" : "NO");
+    file.print("device_binding_firmware_update_changed=");
+    file.println(bindingTest.updateChanged ? "PASS" : "NO");
+    file.print("device_binding_wrong_device_rejected=");
+    file.println(bindingTest.wrongBindingRejected ? "PASS" : "NO");
+    file.print("device_binding_test_cleanup=");
+    file.println(bindingTest.cleanupPassed ? "PASS" : "NO");
 #endif
     file.println();
 
@@ -1178,6 +1236,9 @@ void TFTView_320x240::refreshFriendMeshDiagnostics(void)
     append("IDENTITY %s\nTX %s  STORAGE AEAD %s\n\n", friendmesh::security::signingIdentityStatusName(identityStatus),
            identityStatus == friendmesh::security::SigningIdentityStatus::READY ? "READY" : "DISABLED",
            friendMeshStorageCryptoReady() ? "PASS" : "FAIL");
+    append("STORAGE KEY %s\nDETAIL %s\n\n",
+           friendmesh::storage::FriendMeshStorageKeyManager::statusName(friendMeshStorageKeyStatus()),
+           friendmesh::storage::FriendMeshStorageKeyManager::resultName(friendMeshStorageKeyResult()));
 #if defined(ARDUINO_ARCH_ESP32)
     append("MEMORY BYTES FREE/TOTAL\n");
     append("HEAP %lu/%lu\nLOW %lu  BLOCK %lu\n", static_cast<unsigned long>(ESP.getFreeHeap()),
@@ -1212,19 +1273,81 @@ void TFTView_320x240::refreshFriendMeshDiagnostics(void)
         append("FAILED %s CLEAN %s\n", friendmesh::storage::keySlotSelfTestStepName(slotTest.failedStep),
                slotTest.cleanupPassed ? "PASS" : "FAIL");
     }
+    const auto rebootTest = friendmesh::storage::keySlotRebootTestSnapshot();
+    append("REBOOT TEST %s %lums\n", friendmesh::storage::keySlotRebootTestStateName(rebootTest.state),
+           static_cast<unsigned long>(rebootTest.durationMs));
+    if (rebootTest.state == friendmesh::storage::KeySlotRebootTestState::REBOOT_REQUIRED) {
+        append("USE REBOOT MENU, THEN RUN AGAIN\n");
+    } else if (rebootTest.state == friendmesh::storage::KeySlotRebootTestState::PASSED) {
+        append("INT %s REWRAP %s OLD-PIN %s CLEAN %s\n",
+               rebootTest.interruptedWriteRecovered ? "PASS" : "FAIL",
+               rebootTest.credentialRewrapPassed ? "PASS" : "FAIL",
+               rebootTest.oldCredentialRejected ? "REJECT" : "FAIL", rebootTest.cleanupPassed ? "PASS" : "FAIL");
+    } else if (rebootTest.state == friendmesh::storage::KeySlotRebootTestState::FAILED) {
+        append("FAILED %s CLEAN %s\n", friendmesh::storage::keySlotRebootTestStepName(rebootTest.failedStep),
+               rebootTest.cleanupPassed ? "PASS" : "FAIL");
+    }
+    const auto bindingTest = friendmesh::storage::deviceBindingTestSnapshot();
+    append("BIND TEST %s %lums\n", friendmesh::storage::deviceBindingTestStateName(bindingTest.state),
+           static_cast<unsigned long>(bindingTest.durationMs));
+    if (bindingTest.state == friendmesh::storage::DeviceBindingTestState::REBOOT_REQUIRED) {
+        append("USE REBOOT MENU, THEN RUN AGAIN\n");
+    } else if (bindingTest.state == friendmesh::storage::DeviceBindingTestState::UPDATE_REQUIRED) {
+        append("UPLOAD BUILD B, THEN RUN AGAIN\n");
+    } else if (bindingTest.state == friendmesh::storage::DeviceBindingTestState::PASSED) {
+        append("SAME %s REBOOT %s UPDATE %s WRONG %s CLEAN %s\n",
+               bindingTest.sameDevicePassed ? "PASS" : "FAIL", bindingTest.rebootPassed ? "PASS" : "FAIL",
+               bindingTest.updateChanged ? "PASS" : "FAIL",
+               bindingTest.wrongBindingRejected ? "REJECT" : "FAIL", bindingTest.cleanupPassed ? "PASS" : "FAIL");
+    } else if (bindingTest.state == friendmesh::storage::DeviceBindingTestState::FAILED) {
+        append("FAILED %s CLEAN %s\n", friendmesh::storage::deviceBindingTestStepName(bindingTest.failedStep),
+               bindingTest.cleanupPassed ? "PASS" : "FAIL");
+    }
     append("\n");
     lv_label_set_text(friendMeshKdfBenchmarkButtonLabel,
                       benchmark.state == friendmesh::storage::KdfBenchmarkState::RUNNING ? "Benchmark Running..."
                                                                                          : "Run KDF Benchmark");
     lv_obj_set_state(friendMeshKdfBenchmarkButton, LV_STATE_DISABLED,
-                     benchmark.state == friendmesh::storage::KdfBenchmarkState::RUNNING);
+                     benchmark.state == friendmesh::storage::KdfBenchmarkState::RUNNING ||
+                         slotTest.state == friendmesh::storage::KeySlotSelfTestState::RUNNING ||
+                         rebootTest.state == friendmesh::storage::KeySlotRebootTestState::RUNNING ||
+                         bindingTest.state == friendmesh::storage::DeviceBindingTestState::RUNNING);
     lv_label_set_text(friendMeshKeySlotTestButtonLabel,
                       slotTest.state == friendmesh::storage::KeySlotSelfTestState::RUNNING
                           ? "Slot Test Running..."
                           : "Run TEST Slot Recovery");
     lv_obj_set_state(friendMeshKeySlotTestButton, LV_STATE_DISABLED,
                      benchmark.state == friendmesh::storage::KdfBenchmarkState::RUNNING ||
-                         slotTest.state == friendmesh::storage::KeySlotSelfTestState::RUNNING);
+                         slotTest.state == friendmesh::storage::KeySlotSelfTestState::RUNNING ||
+                         rebootTest.state == friendmesh::storage::KeySlotRebootTestState::RUNNING ||
+                         bindingTest.state == friendmesh::storage::DeviceBindingTestState::RUNNING);
+    lv_label_set_text(friendMeshKeySlotRebootTestButtonLabel,
+                      rebootTest.state == friendmesh::storage::KeySlotRebootTestState::RUNNING
+                          ? "Reboot Test Running..."
+                          : rebootTest.state == friendmesh::storage::KeySlotRebootTestState::REBOOT_REQUIRED
+                                ? "Reboot Required"
+                                : "Run TEST Reboot/Rewrap");
+    lv_obj_set_state(friendMeshKeySlotRebootTestButton, LV_STATE_DISABLED,
+                     benchmark.state == friendmesh::storage::KdfBenchmarkState::RUNNING ||
+                         slotTest.state == friendmesh::storage::KeySlotSelfTestState::RUNNING ||
+                         rebootTest.state == friendmesh::storage::KeySlotRebootTestState::RUNNING ||
+                         rebootTest.state == friendmesh::storage::KeySlotRebootTestState::REBOOT_REQUIRED ||
+                         bindingTest.state == friendmesh::storage::DeviceBindingTestState::RUNNING);
+    lv_label_set_text(friendMeshDeviceBindingTestButtonLabel,
+                      bindingTest.state == friendmesh::storage::DeviceBindingTestState::RUNNING
+                          ? "Binding Test Running..."
+                          : bindingTest.state == friendmesh::storage::DeviceBindingTestState::REBOOT_REQUIRED
+                                ? "Reboot Required"
+                                : bindingTest.state == friendmesh::storage::DeviceBindingTestState::UPDATE_REQUIRED
+                                      ? "Upload Build B Required"
+                                      : "Run TEST Device Binding");
+    lv_obj_set_state(friendMeshDeviceBindingTestButton, LV_STATE_DISABLED,
+                     benchmark.state == friendmesh::storage::KdfBenchmarkState::RUNNING ||
+                         slotTest.state == friendmesh::storage::KeySlotSelfTestState::RUNNING ||
+                         rebootTest.state == friendmesh::storage::KeySlotRebootTestState::RUNNING ||
+                         bindingTest.state == friendmesh::storage::DeviceBindingTestState::RUNNING ||
+                         bindingTest.state == friendmesh::storage::DeviceBindingTestState::REBOOT_REQUIRED ||
+                         bindingTest.state == friendmesh::storage::DeviceBindingTestState::UPDATE_REQUIRED);
 #endif
 
     const size_t visible = std::min<size_t>(8, visibleCount);
@@ -1493,6 +1616,10 @@ void TFTView_320x240::ui_events_init(void)
     lv_obj_add_event_cb(friendMeshDiagnosticsButton, ui_event_friendmesh_diagnostics, LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(friendMeshKdfBenchmarkButton, ui_event_friendmesh_kdf_benchmark, LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(friendMeshKeySlotTestButton, ui_event_friendmesh_key_slot_test, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshKeySlotRebootTestButton, ui_event_friendmesh_key_slot_reboot_test,
+                        LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshDeviceBindingTestButton, ui_event_friendmesh_device_binding_test,
+                        LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(friendMeshDiagnosticsDetailButton, ui_event_friendmesh_diagnostics_detail, LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(friendMeshDiagnosticsBackButton, ui_event_friendmesh_diagnostics_back, LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(friendMeshDiagnosticDetailBackButton, ui_event_friendmesh_diagnostics_detail_back, LV_EVENT_CLICKED, 0);
@@ -3647,6 +3774,22 @@ void TFTView_320x240::ui_event_friendmesh_key_slot_test(lv_event_t *e)
 {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
         friendmesh::storage::runKeySlotSelfTest();
+        THIS->refreshFriendMeshDiagnostics();
+    }
+}
+
+void TFTView_320x240::ui_event_friendmesh_key_slot_reboot_test(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        friendmesh::storage::runKeySlotRebootTest();
+        THIS->refreshFriendMeshDiagnostics();
+    }
+}
+
+void TFTView_320x240::ui_event_friendmesh_device_binding_test(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        friendmesh::storage::runDeviceBindingTest();
         THIS->refreshFriendMeshDiagnostics();
     }
 }

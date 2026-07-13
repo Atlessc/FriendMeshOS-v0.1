@@ -861,6 +861,79 @@ Use this session handoff template beneath the milestone log:
 
 ## Milestone log
 
+### 2026-07-13 — Production storage-key lifecycle boundary implemented
+
+- Status: IMPLEMENTED, HOST-CHECKED, AND BUILT; NOT PHYSICALLY PROVISIONED
+- Branch / HEAD: `develop` / `bd31c45` plus uncommitted Phase 3 changes
+- Roadmap item(s): dedicated storage-PIN policy, explicit master-key lifecycle, production two-slot mapping, factory binding, read-only startup probe, domain-subkey boundary, and fail-closed diagnostics
+- Files changed: `FriendMeshStorageKeyManager.*`, wrapped-key/random/backend interfaces, FriendMesh module/status integration, D-01 UI/export status, storage host harness, Phase 3 design/game plan, decision/risk logs, and roadmap
+- Commands run: `bash bin/check-friendmesh-storage.sh`; `git diff --check`; `/Users/tylersmith/.platformio/penv/bin/pio run -e t-deck-tft`
+- Build/test result: sanitizer-backed storage checks passed, including lifecycle PIN/binding/RNG/rewrap/partial-write and malformed-slot probe cases; the final incremental T-Deck release build passed in 85.31 seconds at RAM 38.4% (125668/327680) and app flash 57.9% (3797221/6553600). The application binary is `.pio/build/t-deck-tft/firmware-t-deck-tft-2.7.26.bd31c45.bin`, 3797648 bytes, SHA-256 `49c6feb712e4efbb81e563ab1b452ada0e2ec1c66264755a1f0c9d222d701be7`.
+- Decisions made: do not reuse the Device UI's plaintext numeric PIN. The production storage boundary accepts a separate exactly-six-ASCII-digit PIN, rejects `000000`, generates the master key/salts/nonces only on explicit provisioning, verifies every two-slot commit, permits only explicit unlock/rewrap, wipes transient key material, and never exposes the master key directly. Startup constructs the production paths only for a read-only probe and performs no KDF or write.
+- Expected first boot: D-01 and the boot log report `STORAGE KEY NOT_CONFIGURED` / `DETAIL NOT_CONFIGURED`; signing identity remains `STORAGE_UNAVAILABLE` and FriendMesh transmit remains disabled. A different fail-closed status is evidence to investigate, not permission to provision automatically.
+- Hardware result: not flashed or run for this slice. No production storage key, PIN-derived value, signing seed, or production storage record has been created.
+- Known issues: T-Deck PIN setup/unlock/change/lock/recovery UI, physical production provisioning, reboot unlock, production rewrap cut points, journal/snapshot power-cut coverage, nonce reboot campaign, plaintext scan, and signing-identity consumer integration remain open. The required `trunk` formatter is unavailable in this environment, so `trunk fmt` could not run. Existing LovyanGFX/Crypto/LVGL dependency warnings remain in the successful build.
+- Next action: implement the explicit T-Deck storage-PIN setup/unlock/rewrap UI with all KDF/filesystem work outside LVGL callbacks, then request operator approval before the first build that can create a production master key is flashed.
+
+### 2026-07-12 — Stable device-binding Build A implemented
+
+- Status: COMPLETE — IMPLEMENTED, HOST-CHECKED, BUILT, PHYSICALLY PASSED, AND EXPORTED
+- Branch / HEAD: `develop` / `bd31c45` plus uncommitted Phase 3 changes
+- Roadmap item(s): stable T-Deck storage binding, fail-closed wrong-device rejection, firmware-update continuity, isolated physical evidence, and secret-free diagnostics
+- Files changed: `FriendMeshDeviceBinding.*`, `FriendMeshDeviceBindingTest.*`, storage host harness, D-01 UI/export integration, Phase 3 design/game plan, decision/risk logs, and roadmap
+- Commands run: `bash bin/check-friendmesh-storage.sh`; `/Users/tylersmith/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
+- Build/test result: sanitizer-backed storage checks passed; corrected Build A passed in 85.25 seconds at RAM 38.4% (125684/327680) and app flash 57.9% (3794829/6553600). Build A is `.pio/build/t-deck-tft/firmware-t-deck-tft-2.7.26.bd31c45.bin`, SHA-256 `ac3e2303b4c42e1a3a030a9acc59ef4099b5dba2401975d3c41bb97548ada816`.
+- Hardware result: corrected Build A passed initial preparation and the same-firmware real-reboot checkpoint. Genuinely changed Build B then produced `SAME PASS REBOOT PASS UPDATE PASS WRONG REJECT CLEAN PASS`.
+- Decisions made: derive the exact 16-byte binding from the factory-burned ESP32-S3 optional unique ID; fail closed on read failure, unsupported target, wrong length, or all-zero input; wipe temporary/output buffers; never persist, log, or export the factory ID, binding, or internal application fingerprint. The isolated test uses only `/friendmesh/diagnostics/device_binding_*` paths and fixed non-secret key material.
+- Export result: `diagnostics_1783926125_00.txt`, `diagnostics_1783926152_00.txt`, and `diagnostics_1783926167_00.txt` independently record `PASS`, failed step `NONE`, 6938 ms, binding available, same-device pass, reboot pass, firmware-update-changed pass, wrong-device rejection, and cleanup pass. Their SHA-256 values are `d64219bf9d40139e37cbe4b62512c4835a16620081e30fb05702b3e09e6dbac0`, `6d4efca7278f98a018845960d1ec6c99c3e214ecdc3bd8c825ac4faee56ffdcc`, and `90846be9f0fa69d99dc03343876b9761f2405e26a175e1d110a4f7a808685d03`.
+- Redaction result: all exports declare keys and message bodies excluded plus node IDs and coordinates redacted; targeted review found no factory ID, binding value, firmware fingerprint, credential, master key, salt, nonce, private key, seed, or PSK. The unrelated key-slot tests are `IDLE`; their false cleanup/result flags are unset defaults rather than executed failures.
+- Known issues: a second-device filesystem-copy test is deferred because only one FriendMesh development T-Deck is available; the host and physical altered-binding checks cover cryptographic rejection without claiming a second-device physical pass. Production key creation, identity persistence, and FriendMesh transmission remain disabled until the next reviewed provisioning slice. The required `trunk` formatter is unavailable in this environment, so `trunk fmt` could not run.
+- Next action: design and implement the production PIN/setup and master-key provisioning boundary using the now-approved KDF, two-slot recovery, and factory binding without enabling FriendMesh transmission prematurely.
+
+#### Build A fingerprint-reader correction
+
+- First hardware result: `FAIL APP_FINGERPRINT CLEAN PASS`; the binding provider itself did not fail, cleanup passed, and no marker or wrapped test key remained.
+- Root cause: the pinned ESP-IDF configuration sets `CONFIG_APP_RETRIEVE_LEN_ELF_SHA=16`, so `esp_ota_get_app_elf_sha256()` returned a configured 16-character prefix plus terminator while the test incorrectly required all 64 SHA-256 hex characters.
+- Correction: read the full 32-byte `app_elf_sha256` already stored in the running `esp_app_desc_t`, reject an absent/all-zero descriptor value, and hex-encode it only into the private in-memory/marker fingerprint. The value remains excluded from logs and diagnostic exports.
+- Verification: corrected Build A compiled successfully at RAM 38.4% and app flash 57.9%; sanitizer-backed storage checks and `git diff --check` pass. The first rebuild attempt exposed only an Arduino `HEX` macro collision in the local lookup-table name; renaming it to `HEX_DIGITS` resolved the compile-only issue.
+- Physical status: corrected Build A requires a normal application upload and a fresh first-stage run; the successful cleanup means no recovery action is needed before retrying.
+
+#### Build A reboot checkpoint passed; Build B generated
+
+- Hardware result: corrected Build A reached `REBOOT REQUIRED`; after the required normal reboot, the second D-01 press reached `UPDATE REQUIRED`. This proves the factory-derived binding reopened the isolated wrapped test key under the unchanged firmware after a real reboot.
+- Build B delta: change only the private diagnostic worker name from `fm-bind-test-a` to `fm-bind-test-b`, guaranteeing a genuinely different application ELF SHA without changing the binding, storage format, production paths, radio behavior, or persisted test contract.
+- Build B result: host storage checks passed; the release build passed in 85.62 seconds at RAM 38.4% (125684/327680) and app flash 57.9% (3794829/6553600). The application binary SHA-256 is `e9f1c0de4c2fc533285694e7fad450551bf5109cd284f1bd68485ef828cf8ba0`, distinct from corrected Build A `ac3e2303b4c42e1a3a030a9acc59ef4099b5dba2401975d3c41bb97548ada816`; `git diff --check` passes.
+- Final physical/export result: `SAME PASS REBOOT PASS UPDATE PASS WRONG REJECT CLEAN PASS`; three redacted exports retain the same 6938 ms result and the gate is complete.
+- Next action: proceed to the reviewed production provisioning boundary.
+
+### 2026-07-12 — Argon2id v1 profile frozen after physical recovery and coexistence gates
+
+- Status: DECISION COMPLETE; COMPILED DEFAULT ALREADY MATCHED THE SELECTED PROFILE
+- Branch / HEAD: `develop` / `bd31c45` plus uncommitted Phase 3 changes
+- Roadmap item(s): final persisted KDF parameters after physical benchmark, transactional wrapped-key recovery, required-reboot interrupted-write/rewrap recovery, and normal UI/radio coexistence validation
+- Files changed: Phase 3 design, game plan, decision log, and roadmap; no firmware source value changed because `FriendMeshMasterKey.h` already defined the selected default
+- Commands run: inspected the passing KDF export/screenshots, passing normal-provider export, passing `diagnostics_1783923089_00.txt`, and post-recovery operator regression confirmation; `git diff --check`
+- Build/test result: the compiled constants remain `STORAGE_KDF_V1_MEMORY_KIB = 1024` and `STORAGE_KDF_V1_OPERATIONS = 3`; the prior clean T-Deck build and sanitizer-backed storage checks pass for this source state
+- Hardware result: the 1024 KiB/3-operation benchmark completed in 1089 ms with healthy heap/PSRAM headroom and concurrent mesh activity. Normal provider recovery passed in 5172 ms. Required-reboot interrupted recovery and credential rewrap passed in 8982 ms with cleanup. Public messaging, private direct messaging, and configuration loading remained healthy afterward.
+- Decisions made: freeze Argon2id v1 at 1024 KiB and three operations. Each wrapped-key record persists its own parameters, so future profiles can change without ambiguity. The general transaction-engine power-cut campaign remains mandatory but no longer gates this measured KDF cost selection.
+- Known issues: stable production device binding, PIN/setup UI, production key provisioning, general journal power-cut coverage, nonce reboot campaign, and plaintext-on-disk audit remain open. Production identity persistence and FriendMesh transmission remain disabled.
+- Next action: define and host-test the stable production device-binding derivation, including firmware-update stability and wrong-device rejection, before any production key is created.
+
+### 2026-07-12 — Two-stage reboot, interrupted-write, and credential-rewrap diagnostic gate passed
+
+- Status: IMPLEMENTED, HOST-CHECKED, BUILT, AND PHYSICALLY PASSED
+- Branch / HEAD: `develop` / `bd31c45` plus uncommitted Phase 3 changes
+- Roadmap item(s): non-production LittleFS interrupted-write recovery, real-reboot persistence, fixed-credential master-key rewrap, old-credential rejection, diagnostic cleanup, and TFT lock-order safety
+- Files changed: `FriendMeshInternalKeySlots.*`, `FriendMeshKeySlotRebootTest.*`, D-01 UI/export integration, Phase 3 design/game plan, decision/risk logs, and roadmap
+- Commands run: `bash bin/check-friendmesh-storage.sh`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft -t clean`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
+- Build/test result: sanitizer-backed storage framing checks passed; a clean T-Deck release build passed in 176.98 seconds at RAM 38.3% (125636/327680) and app flash 57.8% (3790177/6553600); application SHA-256 is `41101aef5049c4aa340cca1fb84c0c4199079ecb53c55cd55a298151df3787dc`
+- Hardware result: the operator normal-uploaded without `uploadfs`, completed stage one, performed the required device-controls reboot, ran stage two, and exported `diagnostics_1783923089_00.txt`. The export records `PASS` in 8982 ms with failed step `NONE`, generation 2, authenticated-slot mask `0x02`, interrupted recovery `PASS`, credential rewrap `PASS`, old credential rejection `PASS`, and cleanup `PASS`.
+- Resource result: the final export recorded internal heap 162360/245496 bytes free, 135188-byte boot low-water, and a 126964-byte largest block; PSRAM 2900259/8385975 bytes free, 2885559-byte low-water, and a 2883572-byte largest block; internal LittleFS use was 73728/3538944 bytes, matching the prior passing-provider baseline after cleanup.
+- Regression result: the operator confirmed public messaging, private direct messaging, configuration loading, and the previously exercised device behavior all remain healthy after the required reboot and cleanup. Simultaneous BLE load is not an acceptance gate under DEC-050.
+- Decisions made: the action uses a dedicated low-priority 12 KiB worker and separate `/friendmesh/diagnostics/keyslot_reboot_*` paths. Stage one commits generation one under a fixed old credential, leaves a fixed non-secret truncated inactive `.tmp`, and writes a marker. A static `REBOOT_REQUIRED` state blocks same-process continuation. After a real reboot, stage two authenticates generation one, clears only the interrupted inactive temporary, commits the same fixed test master key as generation two under a fixed new credential, clears generation one, proves the old credential fails and the new credential succeeds, then removes all test slots, temporaries, and marker.
+- Known issues: this is an isolated diagnostic proof, not production PIN provisioning or automatic startup recovery. It does not exercise every possible power cut during rewrap, stable production device binding, secure erase, the general journal, production identity persistence, or the six-theme storage-state matrix. FriendMesh signing remains `STORAGE_UNAVAILABLE` and transmit-disabled.
+- Next action: freeze the final KDF profile from the completed physical benchmark/recovery/coexistence evidence, then define and test the stable production device binding before enabling identity persistence.
+
 ### 2026-07-12 — D-01 slot-test `spiLock` deadlock diagnosed and corrected
 
 - Status: ROOT CAUSE CONFIRMED; ASYNCHRONOUS CORRECTION BUILT AND PHYSICALLY PASSED

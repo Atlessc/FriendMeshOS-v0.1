@@ -24,6 +24,7 @@ class WrappedKeySlotBackend
     virtual WrappedKeySlotReadResult readSlot(uint8_t slot, uint8_t *record, size_t capacity,
                                               size_t &recordSize) const = 0;
     virtual bool writeSlot(uint8_t slot, const uint8_t *record, size_t recordSize) = 0;
+    virtual bool clearSlot(uint8_t slot) = 0;
 };
 
 enum class WrappedKeyStoreResult : uint8_t {

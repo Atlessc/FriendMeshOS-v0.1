@@ -1,3 +1,5 @@
+#include "friendmesh/storage/FriendMeshDeviceBinding.h"
+#include "friendmesh/storage/FriendMeshStorageKeyManager.h"
 #include "friendmesh/storage/FriendMeshWrappedKeyStore.h"
 
 #include <array>
@@ -139,6 +141,15 @@ class MemorySlotBackend final : public WrappedKeySlotBackend
         return true;
     }
 
+    bool clearSlot(uint8_t slot) override
+    {
+        if (slot >= WRAPPED_KEY_SLOT_COUNT || failClear) return false;
+        slots[slot].fill(0);
+        sizes[slot] = 0;
+        present[slot] = false;
+        return true;
+    }
+
     void setSlot(uint8_t slot, const uint8_t *record, size_t recordSize)
     {
         std::memcpy(slots[slot].data(), record, recordSize);
@@ -150,10 +161,44 @@ class MemorySlotBackend final : public WrappedKeySlotBackend
     bool present[WRAPPED_KEY_SLOT_COUNT]{};
     bool ioError[WRAPPED_KEY_SLOT_COUNT]{};
     bool corruptStoredWrite = false;
+    bool failClear = false;
     size_t failAfterBytes = STORAGE_WRAPPED_KEY_SIZE;
     size_t writeCalls = 0;
     std::array<uint8_t, STORAGE_WRAPPED_KEY_SIZE> slots[WRAPPED_KEY_SLOT_COUNT]{};
     size_t sizes[WRAPPED_KEY_SLOT_COUNT]{};
+};
+
+class TestRandom final : public StorageRandomSource
+{
+  public:
+    bool fill(uint8_t *output, size_t outputSize) const override
+    {
+        if (!available || !output || outputSize == 0) return false;
+        for (size_t index = 0; index < outputSize; ++index) {
+            output[index] = next++;
+        }
+        return true;
+    }
+
+    bool available = true;
+    mutable uint8_t next = 1;
+};
+
+class TestBinding final : public StorageDeviceBindingSource
+{
+  public:
+    DeviceBindingResult read(uint8_t output[STORAGE_DEVICE_BINDING_SIZE]) const override
+    {
+        if (!available || !output) return DeviceBindingResult::HARDWARE_UNAVAILABLE;
+        std::memcpy(output, binding.data(), binding.size());
+        return DeviceBindingResult::OK;
+    }
+
+    bool available = true;
+    std::array<uint8_t, STORAGE_DEVICE_BINDING_SIZE> binding{
+        0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98,
+        0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f, 0xa0,
+    };
 };
 
 int fail(const char *message)
@@ -165,6 +210,38 @@ int fail(const char *message)
 
 int main()
 {
+    std::array<uint8_t, STORAGE_HARDWARE_ID_SIZE> hardwareIdA{};
+    std::array<uint8_t, STORAGE_HARDWARE_ID_SIZE> hardwareIdB{};
+    for (size_t index = 0; index < hardwareIdA.size(); ++index) {
+        hardwareIdA[index] = static_cast<uint8_t>(0x11U + index);
+        hardwareIdB[index] = static_cast<uint8_t>(0x80U + index);
+    }
+    std::array<uint8_t, STORAGE_DEVICE_BINDING_SIZE> derivedBindingA{};
+    std::array<uint8_t, STORAGE_DEVICE_BINDING_SIZE> repeatedBindingA{};
+    std::array<uint8_t, STORAGE_DEVICE_BINDING_SIZE> derivedBindingB{};
+    if (deriveDeviceBinding(hardwareIdA.data(), hardwareIdA.size(), derivedBindingA.data()) !=
+            DeviceBindingResult::OK ||
+        deriveDeviceBinding(hardwareIdA.data(), hardwareIdA.size(), repeatedBindingA.data()) !=
+            DeviceBindingResult::OK ||
+        deriveDeviceBinding(hardwareIdB.data(), hardwareIdB.size(), derivedBindingB.data()) !=
+            DeviceBindingResult::OK ||
+        derivedBindingA != repeatedBindingA || derivedBindingA == derivedBindingB) {
+        return fail("device binding derivation was not stable and distinct");
+    }
+    std::array<uint8_t, STORAGE_HARDWARE_ID_SIZE> zeroHardwareId{};
+    repeatedBindingA.fill(0xa5);
+    if (deriveDeviceBinding(zeroHardwareId.data(), zeroHardwareId.size(), repeatedBindingA.data()) !=
+            DeviceBindingResult::INVALID_HARDWARE_ID ||
+        repeatedBindingA != std::array<uint8_t, STORAGE_DEVICE_BINDING_SIZE>{}) {
+        return fail("invalid hardware id did not fail closed");
+    }
+    repeatedBindingA.fill(0xa5);
+    if (deriveDeviceBinding(hardwareIdA.data(), hardwareIdA.size() - 1, repeatedBindingA.data()) !=
+            DeviceBindingResult::INVALID_HARDWARE_ID ||
+        repeatedBindingA != std::array<uint8_t, STORAGE_DEVICE_BINDING_SIZE>{}) {
+        return fail("short hardware id did not fail closed");
+    }
+
     TestAead aead;
     TestKdf kdf;
     std::array<uint8_t, STORAGE_KEY_SIZE> key{};
@@ -227,11 +304,10 @@ int main()
     }
 
     static constexpr uint8_t credential[] = "739204";
-    std::array<uint8_t, STORAGE_DEVICE_BINDING_SIZE> binding{};
+    const auto binding = derivedBindingA;
     std::array<uint8_t, STORAGE_KDF_SALT_SIZE> salt{};
     std::array<uint8_t, STORAGE_NONCE_SIZE> wrapNonce{};
     std::array<uint8_t, STORAGE_KEY_SIZE> masterKey{};
-    for (size_t i = 0; i < binding.size(); ++i) binding[i] = static_cast<uint8_t>(0x11 + i);
     for (size_t i = 0; i < salt.size(); ++i) salt[i] = static_cast<uint8_t>(0x31 + i);
     for (size_t i = 0; i < wrapNonce.size(); ++i) wrapNonce[i] = static_cast<uint8_t>(0x51 + i);
     for (size_t i = 0; i < masterKey.size(); ++i) masterKey[i] = static_cast<uint8_t>(0x71 + i);
@@ -484,6 +560,120 @@ int main()
     if (conflictStore.load(kdf, aead, credential, sizeof(credential) - 1, binding.data(), loadInfo,
                            recoveredKey.data()) != WrappedKeyStoreResult::GENERATION_CONFLICT) {
         return fail("same-generation divergent master keys were not quarantined");
+    }
+
+    static constexpr uint8_t productionPin[] = "381904";
+    static constexpr uint8_t replacementPin[] = "604217";
+    static constexpr uint8_t invalidZeroPin[] = "000000";
+    static constexpr uint8_t invalidShortPin[] = "12345";
+    static constexpr uint8_t invalidTextPin[] = "12A456";
+    if (!FriendMeshStorageKeyManager::validPin(productionPin, sizeof(productionPin) - 1) ||
+        FriendMeshStorageKeyManager::validPin(invalidZeroPin, sizeof(invalidZeroPin) - 1) ||
+        FriendMeshStorageKeyManager::validPin(invalidShortPin, sizeof(invalidShortPin) - 1) ||
+        FriendMeshStorageKeyManager::validPin(invalidTextPin, sizeof(invalidTextPin) - 1)) {
+        return fail("production PIN policy was not enforced");
+    }
+
+    MemorySlotBackend productionBackend;
+    FriendMeshWrappedKeyStore productionStore(productionBackend);
+    TestRandom productionRandom;
+    TestBinding productionBinding;
+    FriendMeshStorageKeyManager keyManager(productionStore, productionBackend, kdf, aead, kdf, productionRandom,
+                                           productionBinding);
+    if (keyManager.probe() != StorageKeyStatus::NOT_CONFIGURED ||
+        keyManager.provision(invalidZeroPin, sizeof(invalidZeroPin) - 1) != StorageKeyResult::INVALID_PIN ||
+        productionBackend.writeCalls != 0) {
+        return fail("invalid PIN reached production key storage");
+    }
+    productionBackend.present[0] = true;
+    productionBackend.sizes[0] = 7;
+    if (keyManager.probe() != StorageKeyStatus::CORRUPT) {
+        return fail("structurally invalid production slot was reported as locked");
+    }
+    productionBackend.clearSlot(0);
+    productionBinding.available = false;
+    if (keyManager.probe() != StorageKeyStatus::BINDING_UNAVAILABLE) {
+        return fail("missing hardware binding did not fail closed");
+    }
+    productionBinding.available = true;
+    productionRandom.available = false;
+    if (keyManager.provision(productionPin, sizeof(productionPin) - 1) != StorageKeyResult::RANDOM_FAILED ||
+        productionBackend.writeCalls != 0) {
+        return fail("random-source failure reached production key storage");
+    }
+    productionRandom.available = true;
+    if (keyManager.provision(productionPin, sizeof(productionPin) - 1) != StorageKeyResult::OK ||
+        keyManager.status() != StorageKeyStatus::READY || keyManager.generation() != 2 ||
+        !productionBackend.present[0] || !productionBackend.present[1]) {
+        return fail("explicit production key provisioning failed");
+    }
+    std::array<uint8_t, STORAGE_KEY_SIZE> managerSubkey{};
+    if (keyManager.deriveSubkey(StorageKeyDomain::SIGNING_IDENTITY, managerSubkey.data()) != StorageKeyResult::OK ||
+        managerSubkey == std::array<uint8_t, STORAGE_KEY_SIZE>{}) {
+        return fail("ready production manager did not derive a domain subkey");
+    }
+    if (keyManager.provision(replacementPin, sizeof(replacementPin) - 1) !=
+        StorageKeyResult::ALREADY_CONFIGURED) {
+        return fail("production manager silently reprovisioned an existing key");
+    }
+
+    keyManager.lock();
+    managerSubkey.fill(0xa5);
+    if (keyManager.status() != StorageKeyStatus::LOCKED ||
+        keyManager.deriveSubkey(StorageKeyDomain::SIGNING_IDENTITY, managerSubkey.data()) !=
+            StorageKeyResult::LOCKED ||
+        managerSubkey != std::array<uint8_t, STORAGE_KEY_SIZE>{}) {
+        return fail("locking did not revoke production subkey access");
+    }
+    if (keyManager.unlock(wrongCredential, sizeof(wrongCredential) - 1) !=
+            StorageKeyResult::NO_AUTHENTICATED_KEY ||
+        keyManager.status() != StorageKeyStatus::LOCKED ||
+        keyManager.unlock(productionPin, sizeof(productionPin) - 1) != StorageKeyResult::OK ||
+        keyManager.status() != StorageKeyStatus::READY || keyManager.generation() != 2) {
+        return fail("production manager PIN unlock lifecycle failed");
+    }
+    if (keyManager.rewrap(wrongCredential, sizeof(wrongCredential) - 1, replacementPin,
+                          sizeof(replacementPin) - 1) != StorageKeyResult::NO_AUTHENTICATED_KEY ||
+        keyManager.status() != StorageKeyStatus::READY) {
+        return fail("wrong current PIN changed the unlocked production state");
+    }
+    if (keyManager.rewrap(productionPin, sizeof(productionPin) - 1, replacementPin,
+                          sizeof(replacementPin) - 1) != StorageKeyResult::OK ||
+        keyManager.status() != StorageKeyStatus::READY || keyManager.generation() != 4) {
+        return fail("transactional production PIN rewrap failed");
+    }
+    keyManager.lock();
+    if (keyManager.unlock(productionPin, sizeof(productionPin) - 1) !=
+            StorageKeyResult::NO_AUTHENTICATED_KEY ||
+        keyManager.unlock(replacementPin, sizeof(replacementPin) - 1) != StorageKeyResult::OK ||
+        keyManager.generation() != 4) {
+        return fail("retired production PIN still unlocked storage");
+    }
+    keyManager.lock();
+    productionBinding.binding[0] ^= 1;
+    if (keyManager.unlock(replacementPin, sizeof(replacementPin) - 1) !=
+            StorageKeyResult::NO_AUTHENTICATED_KEY ||
+        keyManager.status() != StorageKeyStatus::LOCKED) {
+        return fail("wrong production device binding unlocked storage");
+    }
+
+    MemorySlotBackend failedProvisionBackend;
+    failedProvisionBackend.failAfterBytes = 23;
+    FriendMeshWrappedKeyStore failedProvisionStore(failedProvisionBackend);
+    TestRandom failedProvisionRandom;
+    TestBinding failedProvisionBinding;
+    FriendMeshStorageKeyManager failedProvisionManager(failedProvisionStore, failedProvisionBackend, kdf, aead, kdf,
+                                                       failedProvisionRandom, failedProvisionBinding);
+    if (failedProvisionManager.provision(productionPin, sizeof(productionPin) - 1) !=
+            StorageKeyResult::WRITE_FAILED ||
+        failedProvisionManager.status() != StorageKeyStatus::CORRUPT) {
+        return fail("failed production commit did not fail closed");
+    }
+    managerSubkey.fill(0xa5);
+    if (failedProvisionManager.deriveSubkey(StorageKeyDomain::SIGNING_IDENTITY, managerSubkey.data()) !=
+            StorageKeyResult::LOCKED ||
+        managerSubkey != std::array<uint8_t, STORAGE_KEY_SIZE>{}) {
+        return fail("failed production commit retained usable key material");
     }
 
     std::puts("FriendMesh storage framing checks passed");

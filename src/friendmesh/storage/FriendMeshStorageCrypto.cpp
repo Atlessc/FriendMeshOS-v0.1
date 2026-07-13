@@ -75,22 +75,28 @@ bool FriendMeshStorageCrypto::open(const uint8_t key[STORAGE_KEY_SIZE], const ui
 
 bool FriendMeshStorageCrypto::randomNonce(uint8_t nonce[STORAGE_NONCE_SIZE]) const
 {
+    return fill(nonce, STORAGE_NONCE_SIZE);
+}
+
+bool FriendMeshStorageCrypto::fill(uint8_t *output, size_t outputSize) const
+{
 #if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
-    if (!nonce || !available()) {
+    if (!output || outputSize == 0 || !available()) {
         return false;
     }
     do {
-        randombytes_buf(nonce, STORAGE_NONCE_SIZE);
+        randombytes_buf(output, outputSize);
         uint8_t combined = 0;
-        for (size_t i = 0; i < STORAGE_NONCE_SIZE; ++i) {
-            combined |= nonce[i];
+        for (size_t i = 0; i < outputSize; ++i) {
+            combined |= output[i];
         }
         if (combined != 0) {
             return true;
         }
     } while (true);
 #else
-    (void)nonce;
+    (void)output;
+    (void)outputSize;
     return false;
 #endif
 }

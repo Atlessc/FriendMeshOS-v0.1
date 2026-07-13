@@ -15,6 +15,7 @@ class FriendMeshInternalKeySlots final : public WrappedKeySlotBackend
     WrappedKeySlotReadResult readSlot(uint8_t slot, uint8_t *record, size_t capacity,
                                       size_t &recordSize) const override;
     bool writeSlot(uint8_t slot, const uint8_t *record, size_t recordSize) override;
+    bool clearSlot(uint8_t slot) override;
     bool clearSlots();
 
   private:

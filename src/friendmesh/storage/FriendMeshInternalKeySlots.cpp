@@ -89,28 +89,39 @@ bool FriendMeshInternalKeySlots::writeSlot(uint8_t slot, const uint8_t *record, 
 #endif
 }
 
-bool FriendMeshInternalKeySlots::clearSlots()
+bool FriendMeshInternalKeySlots::clearSlot(uint8_t slot)
 {
 #ifdef FSCom
-    if (!available()) {
+    if (!available() || slot >= WRAPPED_KEY_SLOT_COUNT) {
         return false;
     }
     concurrency::LockGuard guard(spiLock);
     bool cleared = true;
-    for (const char *path : slotPaths) {
-        if (FSCom.exists(path) && !FSCom.remove(path)) {
-            cleared = false;
-        }
-        String temporaryPath(path);
-        temporaryPath += ".tmp";
-        if (FSCom.exists(temporaryPath.c_str()) && !FSCom.remove(temporaryPath.c_str())) {
+    const char *path = slotPaths[slot];
+    if (FSCom.exists(path) && !FSCom.remove(path)) {
+        cleared = false;
+    }
+    String temporaryPath(path);
+    temporaryPath += ".tmp";
+    if (FSCom.exists(temporaryPath.c_str()) && !FSCom.remove(temporaryPath.c_str())) {
+        cleared = false;
+    }
+    return cleared;
+#else
+    (void)slot;
+    return false;
+#endif
+}
+
+bool FriendMeshInternalKeySlots::clearSlots()
+{
+    bool cleared = true;
+    for (uint8_t slot = 0; slot < WRAPPED_KEY_SLOT_COUNT; ++slot) {
+        if (!clearSlot(slot)) {
             cleared = false;
         }
     }
     return cleared;
-#else
-    return false;
-#endif
 }
 
 } // namespace friendmesh::storage
