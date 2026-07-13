@@ -434,7 +434,7 @@ class TFTView_320x240 : public MeshtasticView
     lv_obj_t *friendMeshDiagnosticExportButtonLabel = nullptr;
     lv_obj_t *friendMeshDiagnosticDetailBackButton = nullptr;
     friendmesh::observability::DiagnosticEventStore friendMeshDiagnostics;
-    char friendMeshDiagnosticsBuffer[768] = {};
+    char friendMeshDiagnosticsBuffer[1024] = {};
     char friendMeshDiagnosticDetailBuffer[768] = {};
     uint32_t friendMeshDiagnosticMinimumSequence = 0;
     uint32_t friendMeshDiagnosticRefreshMs = 0;

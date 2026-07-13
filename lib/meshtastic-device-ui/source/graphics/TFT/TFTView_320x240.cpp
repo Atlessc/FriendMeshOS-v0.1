@@ -13,6 +13,7 @@
 #include "graphics/map/URLService.h"
 #include "graphics/view/TFT/Themes.h"
 #if defined(FRIENDMESHOS_TDECK)
+#include "FSCommon.h"
 #include "friendmesh/FriendMeshStatus.h"
 #include "friendmesh/observability/DiagnosticFormatter.h"
 #include "graphics/view/TFT/FriendMeshBranding.h"
@@ -1032,6 +1033,28 @@ bool TFTView_320x240::exportFriendMeshDiagnostics(char *path, size_t pathSize)
     file.println(static_cast<unsigned long>(friendMeshDiagnostics.capacity()));
     file.print("generated_at=");
     file.println(static_cast<unsigned long>(VALID_TIME(actTime) ? actTime : 0));
+#if defined(ARDUINO_ARCH_ESP32)
+    file.print("heap_free=");
+    file.println(static_cast<unsigned long>(ESP.getFreeHeap()));
+    file.print("heap_total=");
+    file.println(static_cast<unsigned long>(ESP.getHeapSize()));
+    file.print("heap_low_water=");
+    file.println(static_cast<unsigned long>(ESP.getMinFreeHeap()));
+    file.print("heap_largest_block=");
+    file.println(static_cast<unsigned long>(ESP.getMaxAllocHeap()));
+    file.print("psram_free=");
+    file.println(static_cast<unsigned long>(ESP.getFreePsram()));
+    file.print("psram_total=");
+    file.println(static_cast<unsigned long>(ESP.getPsramSize()));
+    file.print("psram_low_water=");
+    file.println(static_cast<unsigned long>(ESP.getMinFreePsram()));
+    file.print("psram_largest_block=");
+    file.println(static_cast<unsigned long>(ESP.getMaxAllocPsram()));
+    file.print("internal_fs_used=");
+    file.println(static_cast<unsigned long>(FSCom.usedBytes()));
+    file.print("internal_fs_total=");
+    file.println(static_cast<unsigned long>(FSCom.totalBytes()));
+#endif
     file.println();
 
     char eventBuffer[768];
@@ -1102,8 +1125,20 @@ void TFTView_320x240::refreshFriendMeshDiagnostics(void)
            static_cast<unsigned>(visibleCount), static_cast<unsigned>(friendMeshDiagnostics.size()),
            static_cast<unsigned>(friendMeshDiagnostics.capacity()));
     const auto identityStatus = friendMeshSigningIdentityStatus();
-    append("IDENTITY %s\nTX %s\n\n", friendmesh::security::signingIdentityStatusName(identityStatus),
-           identityStatus == friendmesh::security::SigningIdentityStatus::READY ? "READY" : "DISABLED");
+    append("IDENTITY %s\nTX %s  STORAGE AEAD %s\n\n", friendmesh::security::signingIdentityStatusName(identityStatus),
+           identityStatus == friendmesh::security::SigningIdentityStatus::READY ? "READY" : "DISABLED",
+           friendMeshStorageCryptoReady() ? "PASS" : "FAIL");
+#if defined(ARDUINO_ARCH_ESP32)
+    append("MEMORY BYTES FREE/TOTAL\n");
+    append("HEAP %lu/%lu\nLOW %lu  BLOCK %lu\n", static_cast<unsigned long>(ESP.getFreeHeap()),
+           static_cast<unsigned long>(ESP.getHeapSize()), static_cast<unsigned long>(ESP.getMinFreeHeap()),
+           static_cast<unsigned long>(ESP.getMaxAllocHeap()));
+    append("PSRAM %lu/%lu\nLOW %lu  BLOCK %lu\n", static_cast<unsigned long>(ESP.getFreePsram()),
+           static_cast<unsigned long>(ESP.getPsramSize()), static_cast<unsigned long>(ESP.getMinFreePsram()),
+           static_cast<unsigned long>(ESP.getMaxAllocPsram()));
+    append("FLASH %lu/%lu USED\n\n", static_cast<unsigned long>(FSCom.usedBytes()),
+           static_cast<unsigned long>(FSCom.totalBytes()));
+#endif
 
     const size_t visible = std::min<size_t>(8, visibleCount);
     for (size_t offset = 0; offset < visible; offset++) {

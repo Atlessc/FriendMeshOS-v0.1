@@ -861,6 +861,42 @@ Use this session handoff template beneath the milestone log:
 
 ## Milestone log
 
+### 2026-07-12 — D-01 live heap, PSRAM, fragmentation, and flash telemetry
+
+- Status: IMPLEMENTED, HOST-CHECKED, AND BUILT; PHYSICAL DISPLAY/EXPORT CHECK REMAINS
+- Branch / HEAD: `develop` / `5eee555` plus uncommitted Phase 3 changes
+- Roadmap item(s): one-second storage/resource status, over-utilization evidence, low-water tracking, fragmentation visibility, and retained diagnostic export snapshot
+- Files changed: T-Deck diagnostics view/header, Phase 3 game plan/design contract, and roadmap
+- Commands run: `bin/check-friendmesh-storage.sh`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
+- Build/test result: `t-deck-tft` build passed in 93.80 seconds at RAM 38.3% (125492/327680) and app flash 57.5% (3767405/6553600); application SHA-256 is `46aa9ac6e0934c414a5fc934282dd6f12a5927cccf0fe26a0262641f786305a0`
+- Hardware result: not run for this telemetry addition
+- Decisions made: D-01 reports current/total, boot low-water, and largest contiguous allocation for internal heap and PSRAM, plus internal filesystem used/total; values refresh once per second only while diagnostics is open; exports capture the same snapshot without adding periodic records or radio traffic
+- Known issues: telemetry does not yet classify thresholds as warning/critical; physical layout, scrolling, live value changes, and exported fields require confirmation
+- Next action: normal application upload, open D-01, confirm all resource rows render and update, then export diagnostics and inspect the ten resource fields
+
+### 2026-07-12 — Phase 3 authenticated encrypted-storage foundation activated
+
+- Status: PHASE 3 ACTIVE; DESIGN FREEZE AND RECORD-CODEC VECTORS FIRST
+- Branch / HEAD: `develop` / `0d45a16` plus uncommitted Phase 2 follow-up changes
+- Roadmap item(s): per-device storage master key, PIN protection, domain-separated subkeys, authenticated records, crash-safe nonce rules, internal/SD providers, journal recovery, and durable replay/outbox foundations
+- Authorization: operator explicitly approved starting Phase 3 after the Phase 2 follow-up normal-upload, D-01 status, messaging, private one-to-one messaging, BLE configuration, and existing-feature regression checks passed
+- Safety boundary: no production signing identity, group key, history, or security-sensitive event may be persisted until the storage format, KDF/AEAD choice, nonce strategy, wrong-key/tamper behavior, and recovery rules are documented and deterministic vectors pass
+- First slice: audit the bundled ESP32-S3 primitives and filesystem/PIN boundaries; freeze the threat model and versioned record format; implement an injectable-key authenticated record codec with no production key store
+- Next action: document and verify the cryptographic choices against primary specifications and the pinned framework, then add host/device vector checks before connecting any persistent backend
+
+### 2026-07-12 — Phase 3 authenticated record codec and corrected ESP32 crypto activation
+
+- Status: FIRST PHASE 3 SLICE IMPLEMENTED, HOST-VERIFIED, BUILT, AND PHYSICALLY SELF-TESTED; PROTECTED KEY CUSTODY REMAINS
+- Branch / HEAD: `develop` / `5eee555` plus uncommitted Phase 3 changes
+- Roadmap item(s): versioned authenticated records, random nonce strategy, strict record/context bounds, ESP32-S3 XChaCha adapter, device known-answer self-test, and storage cryptography diagnostics
+- Files changed: `src/friendmesh/storage/`, FriendMesh module/status integration, T-Deck D-01 diagnostics, storage host harness, Phase 3 design contract, decision/risk trackers, game plan, and roadmap
+- Commands run: `bin/check-friendmesh-storage.sh`; all Phase 2 protocol/fuzz/Ed25519/Meshtastic vector scripts; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
+- Build/test result: record round trip, wrong-key, every-byte mutation, every truncation, and context mismatch checks pass under undefined-behavior/bounds sanitizers; existing protocol checks still pass. The first artifact compiled non-ESP stubs because standalone crypto files checked only `ARCH_ESP32`; physical evidence invalidated that build. Both files now accept PlatformIO's global `ARDUINO_ARCH_ESP32` guard. The corrected incremental `t-deck-tft` build passed in 85.10 seconds at RAM 38.3% (125492/327680) and app flash 57.5% (3766329/6553600); the final ELF contains `sodium_init`, Ed25519, and XChaCha symbols; corrected application SHA-256 is `6464adfaf8db5aa9f0f00652d945d12302265e6cc0a7c4ce2e4bd6536bbe9be8`
+- Hardware result: first normal upload showed `IDENTITY CRYPTO_UNAVAILABLE`, `STORAGE AEAD FAIL`, and both explicit boot self-test failures. Root cause was confirmed as compile-time platform selection, not radio traffic or a libsodium runtime failure. After the corrected normal application upload, the physical T-Deck logged `FriendMesh Ed25519 self-test passed`, `FriendMesh XChaCha20-Poly1305 storage self-test passed`, and `STORAGE_UNAVAILABLE` as designed; D-01 displayed the correct identity/TX/storage states. The same boot captured successful SX1262 initialization and a received direct message with successful Meshtastic PKI decryption.
+- Decisions made: use XChaCha20-Poly1305 with a fresh random 192-bit nonce and the exact 84-byte record header as AAD; use explicit Argon2id v1.3 for future PIN wrapping but do not choose parameters until measured on physical T-Deck; existing plaintext numeric UI PIN is not accepted as a storage-KDF boundary; no production master key/provider is created by this slice
+- Known issues: the six-digit PIN is low entropy and software-only protection cannot prevent offline guessing or full-snapshot rollback; physical AEAD evidence, Argon2id benchmark, master-key wrapping, domain contexts, internal/SD providers, journal/snapshot recovery, capacity/failure UI, and power-cut/nonce/plaintext campaigns remain
+- Next action: implement the physical Argon2id benchmark before any production storage master key is generated
+
 ### 2026-07-12 — Phase 2 outbound builder, protected-identity boundary, and decoder fuzzing
 
 - Status: IMPLEMENTED, HOST-VERIFIED, BUILT, AND PHYSICALLY REGRESSION-TESTED; PROTECTED STORAGE AND TWO-FRIENDMESH EXCHANGE REMAIN

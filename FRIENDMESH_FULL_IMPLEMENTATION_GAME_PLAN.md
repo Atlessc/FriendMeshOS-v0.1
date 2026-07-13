@@ -1,6 +1,6 @@
 # FriendMesh Full Implementation Game Plan
 
-Status: active implementation; Phase 2 foundation in progress
+Status: active implementation; Phase 3 storage foundation in progress while remaining Phase 2 physical/identity gates stay open
 Target: LilyGO T-Deck / T-Deck Plus class hardware using `t-deck-tft`  
 FriendMeshOS version at planning time: `v0.2.1`  
 Meshtastic base: `v2.7.26.54e0d8d`
@@ -47,7 +47,7 @@ Status rules:
 - [ ] Phase 16 — Full security, reliability, and six-theme qualification.
 - [ ] Phase 17 — Release qualification.
 
-Current implementation focus: **Phase 2 FriendMesh protobuf and signing identity**. Phase 0 artifacts and Phase 1 compatibility/observability implementation remain unchecked because the working tree is uncommitted and the focused native suite, encrypted-air/PKI vectors, and controlled multihop evidence are still open. The operator explicitly deferred those remaining gates on 2026-07-12 and authorized Phase 2 work; the deferral is not a completion claim and the missing evidence remains mandatory before release qualification.
+Current implementation focus: **Phase 3 authenticated encrypted storage**, which is a required dependency for completing Phase 2 signing-identity persistence and transmission. Phase 0/1 remain unchecked because their named release evidence is still open, and Phase 2 remains unchecked until protected identity persistence/UI and two-device signed exchange pass. The operator explicitly authorized beginning Phase 3 on 2026-07-12; this dependency work does not waive any earlier phase gate.
 
 ---
 
@@ -1199,35 +1199,43 @@ Tests/gate:
 - [x] Invalid-signature, replayed, stale-sequence, stale/future-time, wrong-sender, wrong-group, and wrong-epoch events are rejected by the host protocol checker.
 - [x] Canonical frame round trips, unknown fields, unknown versions/types, maximum payload, and replay-capacity exhaustion are covered.
 - [x] Run 150,000 deterministic random/mutated decoder cases under host undefined-behavior and bounds sanitizers; this found and fixed unsafe reads of unknown Nanopb enum values.
-- [ ] Confirm the firmware crypto self-test and receiver-ready log on physical T-Deck hardware.
+- [x] Confirm the firmware crypto self-test and receiver-ready log on physical T-Deck hardware.
 - [x] Confirm the previously working T-Deck/Meshtastic behavior remains unaffected after the Phase 2 application upload; operator reported it still works on 2026-07-12.
 
 Implementation contract: [`docs/friendmesh/PHASE2_PROTOCOL_CONTRACT.md`](docs/friendmesh/PHASE2_PROTOCOL_CONTRACT.md). Phase 2 remains open until the identity UI/persistence, fuzzing, transmit exchange, physical regression, and theme/input gates pass.
 
 ### Phase 3 — Encrypted storage and transaction engine
 
+Implementation contract: [`docs/friendmesh/PHASE3_STORAGE_CRYPTO_DESIGN.md`](docs/friendmesh/PHASE3_STORAGE_CRYPTO_DESIGN.md).
+
 Build:
 
-- Device storage key, PIN protection, subkey derivation, AEAD records.
-- Internal essential store and SD storage provider.
-- Append-only journal, snapshots, index, compaction, schema migration, transaction recovery.
-- Capacity accounting and fallback.
-- Durable outbox and pending-event scheduler.
+- [ ] Device storage key, PIN protection, subkey derivation, AEAD records.
+- [x] Freeze XChaCha20-Poly1305 record framing, authenticated header, bounded decoder, and random-nonce rule.
+- [x] Implement the injected-key record codec and ESP32-S3 libsodium adapter without creating a production key store.
+- [ ] Physically benchmark Argon2id and freeze persisted KDF parameters, wrapped-master-key format, and domain contexts.
+- [ ] Internal essential store and SD storage provider.
+- [ ] Append-only journal, snapshots, index, compaction, schema migration, transaction recovery.
+- [ ] Capacity accounting and fallback.
+- [ ] Durable outbox and pending-event scheduler.
 
 Design:
 
-- Storage status/detail screen.
-- Clear SD/no-SD feature comparison.
-- Full/read-only/removed/corrupt states and cleanup actions.
-- Security-sensitive PIN flows consistent across themes.
+- [ ] Storage status/detail screen.
+- [x] Add one-second D-01 heap, PSRAM, fragmentation, low-water, and internal-filesystem telemetry plus export snapshot fields.
+- [ ] Clear SD/no-SD feature comparison.
+- [ ] Full/read-only/removed/corrupt states and cleanup actions.
+- [ ] Security-sensitive PIN flows consistent across themes.
 
 Tests/gate:
 
-- Power cut at every transaction boundary.
-- SD removal/full/corrupt/read-only.
-- Nonce uniqueness across reboot.
-- No plaintext secrets/history on disk.
-- All six themes cover storage degraded/error/recovery states.
+- [x] Host record checks cover round trip, wrong key, every byte mutation, all truncations, and context mismatch under UB/bounds sanitizers.
+- [x] Run the XChaCha known-answer self-test on physical T-Deck hardware.
+- [ ] Power cut at every transaction boundary.
+- [ ] SD removal/full/corrupt/read-only.
+- [ ] Nonce uniqueness across reboot.
+- [ ] No plaintext secrets/history on disk.
+- [ ] All six themes cover storage degraded/error/recovery states.
 
 ### Phase 4 — Group domain model and security status
 

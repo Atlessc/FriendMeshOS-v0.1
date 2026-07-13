@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
 #include <sodium.h>
 #endif
 
@@ -11,7 +11,7 @@ namespace friendmesh::security
 
 bool FriendMeshCrypto::available()
 {
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
     return sodium_init() >= 0;
 #else
     return false;
@@ -20,7 +20,7 @@ bool FriendMeshCrypto::available()
 
 bool FriendMeshCrypto::generateSeed(uint8_t seed[ED25519_SEED_SIZE])
 {
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
     if (!seed || !available()) {
         return false;
     }
@@ -35,7 +35,7 @@ bool FriendMeshCrypto::generateSeed(uint8_t seed[ED25519_SEED_SIZE])
 bool FriendMeshCrypto::derivePublicKey(const uint8_t seed[ED25519_SEED_SIZE],
                                        uint8_t publicKey[ED25519_PUBLIC_KEY_SIZE])
 {
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
     if (!seed || !publicKey || !available()) {
         return false;
     }
@@ -54,7 +54,7 @@ bool FriendMeshCrypto::sign(const uint8_t seed[ED25519_SEED_SIZE],
                             const uint8_t expectedPublicKey[ED25519_PUBLIC_KEY_SIZE], const uint8_t *message,
                             size_t messageSize, uint8_t signature[ED25519_SIGNATURE_SIZE])
 {
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
     if (!seed || !expectedPublicKey || (!message && messageSize != 0) || !signature || !available()) {
         return false;
     }
@@ -84,7 +84,7 @@ bool FriendMeshCrypto::sign(const uint8_t seed[ED25519_SEED_SIZE],
 bool FriendMeshCrypto::verify(const uint8_t publicKey[ED25519_PUBLIC_KEY_SIZE], const uint8_t *message,
                               size_t messageSize, const uint8_t signature[ED25519_SIGNATURE_SIZE])
 {
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
     return publicKey && (!message ? messageSize == 0 : true) && signature && available() &&
            crypto_sign_verify_detached(signature, message, messageSize, publicKey) == 0;
 #else
@@ -101,7 +101,7 @@ void FriendMeshCrypto::secureWipe(void *value, size_t size)
     if (!value) {
         return;
     }
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
     sodium_memzero(value, size);
 #else
     volatile uint8_t *bytes = static_cast<volatile uint8_t *>(value);
@@ -113,7 +113,7 @@ void FriendMeshCrypto::secureWipe(void *value, size_t size)
 
 bool FriendMeshCrypto::selfTest()
 {
-#if defined(ARCH_ESP32)
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
     static constexpr uint8_t seed[ED25519_SEED_SIZE] = {
         0x9d, 0x61, 0xb1, 0x9d, 0xef, 0xfd, 0x5a, 0x60, 0xba, 0x84, 0x4a, 0xf4, 0x92, 0xec, 0x2c, 0xc4,
         0x44, 0x49, 0xc5, 0x69, 0x7b, 0x32, 0x69, 0x19, 0x70, 0x3b, 0xac, 0x03, 0x1c, 0xae, 0x7f, 0x60,

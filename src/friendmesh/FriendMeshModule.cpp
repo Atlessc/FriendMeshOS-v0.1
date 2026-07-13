@@ -6,6 +6,7 @@
 #include "friendmesh/protocol/FriendMeshProtocol.h"
 #include "friendmesh/security/FriendMeshCrypto.h"
 #include "friendmesh/security/FriendMeshIdentityBinding.h"
+#include "friendmesh/storage/FriendMeshStorageCrypto.h"
 #include "gps/RTC.h"
 #include "mesh/NodeDB.h"
 #include <cstring>
@@ -18,6 +19,11 @@ friendmesh::security::SigningIdentityStatus friendMeshSigningIdentityStatus()
                             : friendmesh::security::SigningIdentityStatus::STORAGE_UNAVAILABLE;
 }
 
+bool friendMeshStorageCryptoReady()
+{
+    return friendMeshModule && friendMeshModule->storageCryptoSelfTestPassed();
+}
+
 FriendMeshModule::FriendMeshModule() : SinglePortModule("FriendMesh", meshtastic_PortNum_PRIVATE_APP)
 {
     cryptoReady = friendmesh::security::FriendMeshCrypto::selfTest();
@@ -25,6 +31,13 @@ FriendMeshModule::FriendMeshModule() : SinglePortModule("FriendMesh", meshtastic
         LOG_ERROR("FriendMesh Ed25519 self-test failed; signed envelopes disabled");
     } else {
         LOG_INFO("FriendMesh Ed25519 self-test passed; signed envelope receiver ready");
+    }
+    friendmesh::storage::FriendMeshStorageCrypto storageCrypto;
+    storageCryptoReady = storageCrypto.selfTest();
+    if (storageCryptoReady) {
+        LOG_INFO("FriendMesh XChaCha20-Poly1305 storage self-test passed; encrypted record codec ready");
+    } else {
+        LOG_ERROR("FriendMesh XChaCha20-Poly1305 storage self-test failed; encrypted persistence disabled");
     }
     const auto identityStatus = signingIdentity.initialize(nullptr);
     LOG_INFO("FriendMesh outbound signing identity: %s; transmit disabled until protected storage is available",

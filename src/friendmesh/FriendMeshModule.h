@@ -11,6 +11,7 @@ class FriendMeshModule : public SinglePortModule
   public:
     FriendMeshModule();
     friendmesh::security::SigningIdentityStatus signingIdentityStatus() const { return signingIdentity.status(); }
+    bool storageCryptoSelfTestPassed() const { return storageCryptoReady; }
 
   protected:
     ProcessMessage handleReceived(const meshtastic_MeshPacket &packet) override;
@@ -19,6 +20,7 @@ class FriendMeshModule : public SinglePortModule
     friendmesh::protocol::FriendMeshReplayWindow replayWindow;
     friendmesh::security::FriendMeshSigningIdentity signingIdentity;
     bool cryptoReady = false;
+    bool storageCryptoReady = false;
 };
 
 extern FriendMeshModule *friendMeshModule;
