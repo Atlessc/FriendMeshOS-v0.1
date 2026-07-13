@@ -4,6 +4,9 @@
 #include "modules/SystemCommandsModule.h"
 #endif
 #include "modules/StatusLEDModule.h"
+#if defined(FRIENDMESHOS_TDECK)
+#include "friendmesh/FriendMeshModule.h"
+#endif
 #if !MESHTASTIC_EXCLUDE_REPLYBOT
 #include "ReplyBotModule.h"
 #endif
@@ -117,6 +120,9 @@ void setupModules()
     }
 #endif
     statusLEDModule = new StatusLEDModule();
+#if defined(FRIENDMESHOS_TDECK)
+    friendMeshModule = new FriendMeshModule();
+#endif
 #if !MESHTASTIC_EXCLUDE_REPLYBOT
     new ReplyBotModule();
 #endif

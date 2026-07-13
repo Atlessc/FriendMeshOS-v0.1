@@ -497,8 +497,9 @@ git fetch --all --tags --prune
 git switch develop
 git status --short --branch
 git tag --list
-git submodule status
 ```
+
+FriendMeshOS vendors `protobufs/`, `meshtestic/`, and `lib/meshtastic-device-ui/` as ordinary repository content. No `git submodule init`, `git submodule update`, or separate dependency-repository pull is part of setup.
 
 Expected project anchors at the time this handbook was written:
 
@@ -860,13 +861,126 @@ Use this session handoff template beneath the milestone log:
 
 ## Milestone log
 
+### 2026-07-12 — Phase 2 signed-envelope receiver foundation
+
+- Status: IMPLEMENTED AND HOST-VERIFIED; PHASE 2 REMAINS OPEN FOR PERSISTENCE, UI, FUZZING, TRANSMIT, AND PHYSICAL TESTS
+- Branch / HEAD: `develop` / `876ec56` plus uncommitted working-tree changes
+- Roadmap item(s): bounded FriendMesh protobuf, `PRIVATE_APP` dispatch, canonical signing, Ed25519 identity, Meshtastic PKI binding, replay/time/version rejection, and deterministic vectors
+- Files changed: `protobufs/friendmesh/`, `src/friendmesh/`, `src/modules/Modules.cpp`, Phase 2 check/generation scripts, protocol contract, decision/risk/delta trackers, game plan, and roadmap
+- Commands run: `bin/regen-friendmesh-protos.sh`; `bin/check-friendmesh-protocol.sh`; `bin/check-friendmesh-ed25519.sh`; `bin/check-friendmesh-vectors.sh`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
+- Build/test result: a final clean `t-deck-tft` rebuild passed in 176.48 seconds at RAM 38.2% (125328/327680) and app flash 55.5% (3637209/6553600); application SHA-256 is `d54577b4f5d54a4dd4218dd0dec259876df9624d42bbc484ed058228854e789c`; strict protocol/replay checks, RFC 8032 Ed25519 positive/mutation/`S + L` malleability vectors, and ten Meshtastic v2.7.26 compatibility vectors pass
+- Hardware result: not run; no device was connected, flashed, reset, rebooted, or otherwise mutated
+- Decisions made: v1 is `FMSH` plus version byte plus one bounded canonical Nanopb envelope on `PRIVATE_APP`; Ed25519 uses the ESP32 framework's libsodium and a separate seed; the signature covers the canonical inline payload; the NodeDB X25519 match is consistency evidence, not person verification; accepted identity bindings remain explicitly untrusted; valid RTC enables 24-hour-past/10-minute-future rejection
+- Known issues: signing seed and replay persistence await Phase 3; the receiver has no transmit/UI/group-encryption path; volatile replay cannot authorize state changes; fuzzing, physical crypto self-test, two-FriendMesh exchange, opaque stock relay, and stock regression remain open; the eight-group carrier still lacks inner AEAD and cannot be called private
+- Next action: normal-upload without `uploadfs` and verify the FriendMesh Ed25519 self-test log plus ordinary Meshtastic regression before implementing protected identity persistence/UI
+
+### 2026-07-12 — Phase 2 authorized with explicit Phase 1 deferrals
+
+- Status: PHASE 2 ACTIVE; REMAINING PHASE 1 GATES DEFERRED, NOT PASSED
+- Branch / HEAD: `develop` / `876ec56` plus uncommitted working-tree changes
+- Roadmap item(s): begin the FriendMesh protobuf, signed envelope, identity, replay/version rejection, and deterministic-vector foundation
+- Decisions made: the operator authorized moving forward after the diagnostics, themes, inputs, BLE, reboot chooser, ordinary private-channel, bidirectional PKI DM, position request, traceroute, and long-range public reception checks passed; missing native-host execution, encrypted-air/PKI vectors, and controlled multihop proof remain recorded requirements
+- Phase 2 boundary: no group creation, invitation, membership, history, map privacy, or SOS behavior may treat the new envelope as secure until bounded decoding, canonical signing bytes, signature verification, replay rejection, wrong-group/wrong-epoch rejection, identity binding, and deterministic vectors pass
+- Next action: audit the pinned protobuf generator, `PRIVATE_APP` dispatch, available Ed25519 implementation, Meshtastic PKI identity lifecycle, and storage boundary before freezing `friendmesh.proto`
+
+### 2026-07-12 — Phase 1 physical diagnostics matrix and separate reboot chooser
+
+- Status: DIAGNOSTICS MATRIX AND REPLACEMENT REBOOT CHOOSER PHYSICALLY PASSED
+- Branch / HEAD: `develop` / `876ec56` plus uncommitted working-tree changes
+- Roadmap item(s): close D-01/D-02 theme/input/export checks, verify BLE configuration, and prevent startup branding from covering reboot/pairing/shutdown controls
+- Files changed: T-Deck view runtime boot/reboot styling and visibility logic; branding contract; FriendMesh game plan, delta ledger, and roadmap
+- Commands run: `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `bash bin/check-friendmesh-vectors.sh`; `git diff --check`; application SHA-256
+- Build/test result: `t-deck-tft` passed in 92.48 seconds; RAM 38.2% (125328/327680), app flash 55.5% (3635357/6553600); all ten fixed protobuf vectors passed; application SHA-256 `811a524e732bf2352cf0b89f3b2f04aa5f66cd584d02deef06dc0a8188c97670`
+- Hardware result: older/newer diagnostic navigation passed; Clear view plus export-of-all-retained-events passed; all six themes passed; touch, trackball, and keyboard navigation passed; BLE phone connection/configuration passed; inspected SD export contained seven of seven retained events with coordinates/node IDs redacted and bodies/keys excluded; public-channel text arrived from a node reported 13 km away; startup-only splash plus separate Restart/Pairing mode/Power off chooser, labels, focus/navigation, cancel, and device-control behavior all passed after normal application upload
+- Decisions made: the full FriendMeshOS image and live version labels are startup-only; the reboot chooser is a separate opaque dark device-controls state with explicit Restart, Pairing mode, Power off, and background-cancel labels; all startup objects are hidden and the chooser is moved to the foreground before interaction
+- Known issues: the 13 km reception is range evidence, not a controlled multihop pass unless hop metadata or an isolated relay path proves it; native tests remain host-blocked by missing `pkg-config`/`argp.h`; encrypted-air/PKI vector expansion remains
+- Next action: unblock the focused native suite and add encrypted-channel/PKI compatibility vectors, then begin the gated Phase 2 FriendMesh envelope and signing-identity foundation
+
+### 2026-07-12 — Phase 1 automatic diagnostics, semantic detail, and redacted export
+
+- Status: IMPLEMENTED AND BUILT; PHYSICAL D-01/D-02 MATRIX PENDING
+- Branch / HEAD: `develop` / `876ec56` plus uncommitted working-tree changes
+- Roadmap item(s): finish position-freshness runtime events, automatic D-01 refresh, D-02 semantic packet/error detail, non-destructive clear-view behavior, and safe diagnostic export
+- Files changed: FriendMesh observability formatter/store/model and tests; T-Deck diagnostics header/source; baseline manifest, delta ledger, game plan, and roadmap
+- Commands run: `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `bash bin/check-friendmesh-vectors.sh`; `$HOME/.platformio/penv/bin/pio test -e native -f test_friendmesh_observability`; `git diff --check`; artifact SHA-256
+- Build/test result: final `t-deck-tft` build passed in 92.81 seconds; RAM 38.2% (125328/327680), app flash 55.5% (3634813/6553600); all ten fixed protobuf vectors passed; application SHA-256 `187fc36a6c9b42fd170a689bbfbd4d681bd522929dad1a12d8455beb54f62870`; focused native test remains host-blocked before FriendMesh compilation by missing `pkg-config` and `argp.h`
+- Hardware result: not run for this replacement build; no device was accessed or mutated
+- Decisions made: eight FriendMesh application groups share one managed secondary Meshtastic carrier; each group remains independently authorized and encrypted above that carrier; diagnostics refresh only while visible; the 16-record RAM ring remains bounded and secret-free; Clear view hides existing records without deleting the ring; export includes every retained event even when hidden by Clear view, requires SD and a second explicit confirmation, and is plaintext, redacted, and non-restorable
+- Known issues: physical verification is still required across six themes and touch/trackball/keyboard; BLE phone regression and controlled multihop evidence remain; the carrier/group protocol itself begins in later gated phases and is not implemented by this diagnostics build
+- Next action: normal-upload the application firmware without `uploadfs`, then verify D-01 live refresh, D-02 event navigation/error names, Clear view, SD export, all six themes, and all three input methods
+
+### 2026-07-12 — first physical report, embedded splash, and offline-only map build
+
+- Status: PHYSICAL REGRESSION FIXES VERIFIED ON TESTED PAIR; PHASE 1 DIAGNOSTIC GATES REMAIN
+- Branch / HEAD: `develop` / `876ec56` plus uncommitted working-tree changes
+- Roadmap item(s): record the first D-01/stock-interoperability test report, restore firmware-only FriendMeshOS startup branding, and prevent synchronous online map-tile stalls
+- Files changed: FriendMesh branding generator/asset/header, T-Deck view, branding documentation, FriendMesh game plan, and roadmap
+- Commands run: `python3 branding/generate_friendmeshos_assets.py`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`; app SHA-256
+- Build/test result: final `t-deck-tft` build passed in 93.00 seconds; RAM 38.2% (125232/327680), app flash 55.4% (3628369/6553600); all ten fixed protobuf vectors passed; application SHA-256 `cde7676df92206152e142ca14af425161a4a3cc4f43d8697f175a6ec1f569936`
+- Hardware result: replacement build passed the application-embedded FriendMeshOS `v0.2.1` splash, nonblocking offline-only map, ordinary private-channel text, bidirectional PKI DM, Signal Scanner/position request, and Trace Route checks on the tested FriendMeshOS/stock pair; stale peer PKI state was recovered through peer-only NodeDB removal and fresh NodeInfo without factory reset or key regeneration; date/timestamp behavior remains dependent on valid received/local time; durable FriendMesh queuing is not implemented
+- Decisions made: embed the compressed 320x240 splash in the application binary rather than depend on LittleFS; retain live `FriendMeshOS v0.2.1` and upstream-base labels; disable FriendMesh online fallback tiles at compile time while preserving SD tiles and a future explicit re-enable flag; do not classify the PKI failure as a channel-PSK failure
+- Known issues: the current stock queue is not the planned 24-hour durable FriendMesh queue; controlled multihop, BLE, and six-theme/three-input diagnostics evidence remain
+- Next action: physically verify the replacement D-01/D-02 build, then complete the six-theme/three-input diagnostics matrix and BLE phone regression
+
+### 2026-07-12 — Phase 1 runtime diagnostics and first D-01 screen
+
+- Status: IMPLEMENTED AND BUILT; PHYSICAL UI VERIFICATION PENDING
+- Branch / HEAD: `develop` / `876ec56` plus uncommitted working-tree changes
+- Roadmap item(s): connect the bounded secret-free diagnostics store to runtime packet/queue events and expose the first D-01 T-Deck view
+- Files changed: device-ui `MeshtasticView`, `ViewController`, and `TFTView_320x240` headers/sources; FriendMesh game plan, baseline manifest, upstream-delta ledger, and roadmap
+- Commands run: `bash bin/check-friendmesh-vectors.sh`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`; artifact SHA-256
+- Build/test result: all ten fixed vectors passed; `t-deck-tft` passed in 92.85 seconds with RAM 38.2% (125248/327680) and app flash 55.5% (3640521/6553600); normal-app SHA-256 `bd83f4fabf4fa0d5cdaf1de8f090d571b6b4724e6cfafb453b7c05c754fbe903`
+- Hardware result: not run for this build; no device was accessed or mutated
+- Decisions made: reuse the controller/view boundary instead of observing radio callbacks; queue hook defaults to no-op for other views; create the FriendMesh screen dynamically instead of editing generated EEZ files; show only capability state and redacted port/channel/destination/hops/PKI/ACK/NAK/queue metadata
+- Known issues: the screen shows the eight newest of 16 RAM-only records and clears on reboot; GPS `READY` requires a received local position; maps remain `DEGRADED` until tile inventory is implemented; original T-Deck magnetometer is `N/A`; position-freshness events, D-02 detail/export, automatic refresh while open, and all six-theme/three-input physical evidence remain
+- Next action: normal-upload with operator approval, open Settings → Tools → FriendMesh Diagnostics, verify capability states and packet/queue records using touch/trackball/keyboard across all six themes, then implement position freshness and D-02 detail/export
+
+### 2026-07-12 — Phase 1 fixed vectors and bounded diagnostic history
+
+- Status: PARTIAL PHASE 1 COMPLETE; UI/RUNTIME/PHYSICAL GATES REMAIN
+- Branch / HEAD: `develop` / `876ec56` plus uncommitted working-tree changes
+- Roadmap item(s): capture Meshtastic v2.7.26 protobuf compatibility vectors and provide bounded secret-free diagnostic history for D-01/D-02
+- Files changed: `test/fixtures/MeshtasticV2726Vectors.h`, `test/test_friendmesh_compatibility_vectors/test_main.cpp`, `bin/friendmesh-vector-check.cpp`, `bin/check-friendmesh-vectors.sh`, `src/friendmesh/observability/DiagnosticEventStore.*`, observability tests, baseline manifest, game plan, and roadmap
+- Commands run: `bash bin/check-friendmesh-vectors.sh`; `$HOME/.platformio/penv/bin/pio test -e native -f test_friendmesh_observability`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
+- Build/test result: all ten public/channel text, position, NodeInfo, telemetry, traceroute, routing ACK/NAK, and BLE boundary vectors passed byte-for-byte against checked-in Nanopb; `t-deck-tft` passed in 191.45 seconds at RAM 38.2% and app flash 55.5%; native execution remains host-blocked by missing `pkg-config`/`argp.h`
+- Hardware result: operator confirmed configured ordinary channels still open and disabled/unconfigured channel slots remain unavailable after the prior normal upload; no new firmware was flashed for this slice
+- Decisions made: fixtures contain only synthetic identifiers, key bytes, coordinates, timestamps, and text; the diagnostic ring is fixed at 16 records, chronological, oldest-evicting, and contains metadata only
+- Known issues: fixtures are protobuf-boundary vectors, not channel-encrypted air frames or PKI crypto vectors; runtime packet/capability adapters and D-01/D-02 UI are not connected; stock-node, BLE, multihop, and six-theme tests remain
+- Next action: connect read-only runtime observers to the bounded store, then render D-01/D-02 through the existing T-Deck navigation/focus model without changing Meshtastic send/routing behavior
+
+### 2026-07-12 — clean application-upload readiness check
+
+- Status: READY FOR OPERATOR-RUN NORMAL UPLOAD; PHYSICAL RESULT PENDING
+- Branch / HEAD: `develop` / `876ec56` plus uncommitted working-tree changes
+- Roadmap item(s): prepare and verify the current `t-deck-tft` firmware without changing the connected device or its persisted configuration
+- Files changed: `.github/copilot-instructions.md`, `FRIENDMESHOS_ROADMAP.md`, and `docs/friendmesh/MESHTASTIC_V2_7_26_BASELINE.md` clarify that FriendMeshOS dependencies are vendored ordinary files and require no submodule initialization
+- Commands run: `$HOME/.platformio/penv/bin/pio run -e t-deck-tft -t clean`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; artifact SHA-256 checks; `git diff --check`
+- Build/test result: clean `t-deck-tft` build passed in 190.93 seconds; RAM 38.2% (125264/327680); app flash 55.5% (3636773/6553600); normal app SHA-256 `5f4f472413bb4b1b3bf627a15cd45b1a2d35448109d4053bf0cc2fd6b28b2c69`
+- Upload boundary: normal `-t upload` writes the bootloader, partition table, OTA boot selector, and application image; it does not select `uploadfs`, write the separate LittleFS partition, erase the NVS configuration partition, or perform a factory erase
+- Hardware result: not run; no port was opened and no flash, reset, filesystem upload, transmission, or configuration mutation was performed by Codex
+- Known issues: inherited compiler warnings remain; the device port must be re-listed after connection because the T-Deck's 1200-bps bootloader transition can change the `/dev/cu.usbmodem*` name
+- Next action: operator connects the T-Deck, confirms the current port with `pio device list`, runs the approved normal upload command, and reports the upload/boot result for physical verification
+
+### 2026-07-12 — Phase 0 controls and Phase 1 observability foundation
+
+- Status: PHASE 0 STATIC ARTIFACTS COMPLETE IN WORKING TREE; PHASE 1 PARTIALLY IMPLEMENTED; PHYSICAL GATES NOT RUN
+- Branch / HEAD: `develop` / `876ec56` plus uncommitted working-tree changes
+- Roadmap item(s): restore canonical agent instructions; complete FriendMesh game-plan Phase 0; begin Phase 1 compatibility/observability without changing Meshtastic wire behavior
+- Files changed: `.github/copilot-instructions.md`, `docs/friendmesh/*.md`, `MESHTASTIC_CORE_AND_FRIENDMESH_ARCHITECTURE.md`, `FRIENDMESH_FULL_IMPLEMENTATION_GAME_PLAN.md`, `src/friendmesh/observability/*`, `src/friendmesh/platform/*`, and `test/test_friendmesh_observability/test_main.cpp`
+- Commands run: repository/source audits; official release/schema verification; SHA-256 comparisons; Markdown local-link audit; `git diff --check`; `pio test -e native -f test_friendmesh_observability`; and two `pio run -e t-deck-tft` builds
+- Build/test result: both T-Deck builds passed and produced normal/factory/LittleFS/ELF/manifest artifacts; native execution was blocked before the FriendMesh test by missing host `pkg-config`/`argp.h`; `trunk fmt` was unavailable on PATH
+- Hardware result: not run; no flash, reset, transmission, channel/config change, or other device mutation was authorized
+- Decisions made: diagnostics are bounded and secret-free; hop reporting delegates to existing `getHopsAway`; capability states degrade independently; firmware baseline is official commit `54e0d8d0ab2ff56b3a9ce967e53f79e49af560fb`; protobuf baseline is `6b1ded439633cd03d4af85b44231b91d1d106278`
+- Known issues: Phase 0 package is uncommitted; Phase 1 needs generator provenance, fixed byte vectors, runtime probe/UI integration, working native host prerequisites, stock-node/BLE/multihop tests, and six-theme/three-input physical evidence
+- Next action: install/verify the documented native prerequisites or use the supported container, freeze compatibility byte vectors, and connect the capability/packet observers to the D-01/D-02 diagnostics UI before any Phase 2 protocol work
+
 ### 2026-07-12 — complete FriendMesh product game plan
 
 - Status: COMPLETE FOR REQUIREMENTS AND EXECUTION PLANNING; FEATURE IMPLEMENTATION NOT STARTED
 - Branch / HEAD: `develop` working tree based on the current reviewed FriendMeshOS state
 - Roadmap item(s): convert the complete friends/groups requirements interview into a trackable foundation-to-release implementation plan
 - Files changed: `FRIENDMESH_FULL_IMPLEMENTATION_GAME_PLAN.md`, `MESHTASTIC_CORE_AND_FRIENDMESH_ARCHITECTURE.md`, `FRIENDMESHOS_ROADMAP.md`, and `README.md`
-- Decisions captured: verified one-device identities, signed epoch membership, four groups/eight members, FriendMesh-only application payloads, secure invite/rekey/removal, encrypted history/sync, complete chat/map/navigation/meetup/marker/SOS/Help behavior, SD-only expansions, protected stock-client interoperability, six-theme gates, and feasibility limits
+- Decisions captured: verified one-device identities, signed epoch membership, eight application groups/eight members per group over one shared Meshtastic carrier, FriendMesh-only application payloads, secure invite/rekey/removal, encrypted history/sync, complete chat/map/navigation/meetup/marker/SOS/Help behavior, SD-only expansions, protected stock-client interoperability, six-theme gates, and feasibility limits
 - Tracking rule: all FriendMesh feature work follows the game plan's master phase tracker; a phase remains unchecked until implementation, automated/physical verification, recovery, documentation, and six-theme evidence are complete
 - Safety result: approved incomplete-firmware warning added to README before feature implementation
 - Build/test result: documentation-only planning; no firmware build required
@@ -880,7 +994,7 @@ Use this session handoff template beneath the milestone log:
 - Roadmap item(s): understand and document Meshtastic layers 1-4, timing, wire framing, routing, reliability, encryption, protobufs, NodeDB, positions, groups, distance, and hop observations before Friend Compass implementation
 - Files changed: `MESHTASTIC_CORE_AND_FRIENDMESH_ARCHITECTURE.md` and `FRIENDMESHOS_ROADMAP.md`
 - Evidence reviewed: pinned firmware radio/router/crypto/channel/NodeDB/position/client sources, vendored protobuf schemas and generated bindings, and official Meshtastic firmware/protobuf/documentation repositories
-- Architecture decision: closed FriendMesh groups use ordinary secondary channels with random 32-byte PSKs; local group metadata references channels and node identities without duplicating keys; group chat and positions remain standard Meshtastic traffic; PKI remains the verified direct-message path
+- Historical architecture decision: closed groups use ordinary secondary channels with random 32-byte PSKs and standard position state. The original ordinary-text/channel-URL-only group-chat/join idea was superseded on 2026-07-12 by the signed `PRIVATE_APP` envelope and verified nearby admission contract; PKI remains the verified direct-message path.
 - Compass decision: distance is great-circle distance from standard positions; hop count is an aged observation from packet metadata or explicit traceroute, not a permanent property of a person
 - Security decision: distinguish AES-CTR channel encryption from X25519-derived AES-256-CCM direct-message PKI and document the lack of cryptographic authentication for group broadcasts
 - Build/test result: documentation-only change; `git diff --check` passed and no firmware build was required

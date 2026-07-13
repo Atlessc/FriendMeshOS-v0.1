@@ -1,6 +1,6 @@
 # FriendMesh Full Implementation Game Plan
 
-Status: approved product requirements; implementation not started  
+Status: active implementation; Phase 2 foundation in progress
 Target: LilyGO T-Deck / T-Deck Plus class hardware using `t-deck-tft`  
 FriendMeshOS version at planning time: `v0.2.1`  
 Meshtastic base: `v2.7.26.54e0d8d`
@@ -47,7 +47,7 @@ Status rules:
 - [ ] Phase 16 — Full security, reliability, and six-theme qualification.
 - [ ] Phase 17 — Release qualification.
 
-Current next phase: **Phase 0 only**. No FriendMesh feature code begins until its remaining documentation/design artifacts are complete and the phase handoff names the implementation files and tests.
+Current implementation focus: **Phase 2 FriendMesh protobuf and signing identity**. Phase 0 artifacts and Phase 1 compatibility/observability implementation remain unchecked because the working tree is uncommitted and the focused native suite, encrypted-air/PKI vectors, and controlled multihop evidence are still open. The operator explicitly deferred those remaining gates on 2026-07-12 and authorized Phase 2 work; the deferral is not a completion claim and the missing evidence remains mandatory before release qualification.
 
 ---
 
@@ -60,7 +60,7 @@ FriendMesh is a T-Deck-only, security-first social and field-coordination system
 The first approved FriendMesh release is withheld until all required systems are implemented and qualified:
 
 - Verified one-device identities.
-- Up to four groups per T-Deck.
+- Up to eight FriendMesh application groups per T-Deck.
 - Eight tested members per group.
 - Secure nearby invitation and admin approval.
 - One admin plus ordinary members.
@@ -192,18 +192,18 @@ Blocking is local to one device:
 
 ### Limits
 
-- Maximum four FriendMesh groups configured per device.
+- Maximum eight FriendMesh application groups configured per device.
 - Maximum eight tested approved members per group in release one.
 - Persistence schema reserves room for a future 16/32-member version without changing existing field meanings.
-- One FriendMesh group consumes one Meshtastic secondary channel slot.
-- The primary plus four groups consumes five of Meshtastic's eight channel slots; the other three remain available for ordinary Meshtastic channels.
-- Joining fails safely if no slot exists and shows the user which slots are occupied. Never overwrite automatically.
+- All FriendMesh groups share one reserved Meshtastic secondary carrier channel, consuming one slot total.
+- The carrier channel is transport only. Its outer PSK is not a group confidentiality or authorization boundary; every group payload requires independent authenticated encryption plus signed group/epoch authorization.
+- Creating or joining additional groups does not allocate additional Meshtastic slots. Initial carrier setup fails safely if no slot exists and never overwrites an ordinary channel.
 
 ### Group fields
 
 - Random 128-bit group ID unrelated to name or PSK.
 - Display name.
-- Meshtastic channel index.
+- Shared FriendMesh carrier reference plus an opaque group dispatch tag that does not expose the raw group ID.
 - Current epoch and random 32-byte channel PSK.
 - Admin signing identity.
 - Ordered membership records.
@@ -259,7 +259,8 @@ Use Meshtastic `PRIVATE_APP` (`256`) initially with:
 - Fixed FriendMesh magic bytes.
 - Protocol major/minor version.
 - Compact Nanopb `FriendMeshEnvelope`.
-- Meshtastic secondary-channel outer encryption using a random 32-byte PSK.
+- One managed Meshtastic secondary carrier channel shared by all FriendMesh groups. Its outer channel encryption is defense in depth and transport compatibility, not group isolation.
+- Independent authenticated encryption for every group epoch using a random 32-byte group key; a carrier participant outside that group cannot decrypt or authorize its events.
 - MQTT disabled.
 - Sender signature over the canonical envelope content.
 
@@ -602,7 +603,7 @@ Persistent top bar:
 
 ### FriendMesh group chooser
 
-- Tiled list of up to four groups.
+- Tiled list of up to eight groups with bounded paging/scrolling on 320x240.
 - Each tile: group name, unread count, reachable/total members, sync state, security state, and active alert badge.
 - Empty tile: Create or Join.
 - One selected FriendMesh group at a time.
@@ -1025,7 +1026,7 @@ Never display PSK bytes.
 
 ## 20. Stock client protection and recovery
 
-- FriendMesh-owned channel slots remain present in ordinary channel configuration.
+- The single FriendMesh carrier slot remains present in ordinary channel configuration.
 - Stock clients may read metadata needed for compatibility.
 - Edit/delete attempts receive a clear protected-channel error.
 - BLE synchronization and all unrelated Meshtastic configuration continue working.
@@ -1116,6 +1117,15 @@ Gate:
 - `git diff --check` and Markdown-link audit pass.
 - README cannot be mistaken for a finished emergency/security product.
 
+Working-tree evidence, 2026-07-12:
+
+- Added `.github/copilot-instructions.md` as the canonical verified repository/FriendMesh agent contract.
+- Added decision log, unresolved-risk register, canonical glossary, upstream-delta ledger, and pinned-baseline manifest under `docs/friendmesh/`.
+- Froze 320x240 reusable patterns and traceable wireframes for all required product areas, plus six-theme and three-input state matrices.
+- Reconciled the architecture handbook's obsolete channel-URL-only admission flow to the approved signed nearby invitation/admin approval/member grant flow.
+- `git diff --check` and an 11-file local Markdown-link audit passed before Phase 1 coding.
+- Phase remains unchecked because these working-tree artifacts are not yet committed; no commit was authorized in this session.
+
 ### Phase 1 — Meshtastic compatibility and observability harness
 
 Build:
@@ -1138,15 +1148,41 @@ Tests/gate:
 - BLE phone sync passes.
 - All six themes render diagnostics/missing-capability screens.
 
+Current implementation evidence, 2026-07-12:
+
+- Added a secret-free read-only observer for destination type, channel, decoded/encrypted state, port, ACK/NAK and error enum, existing Meshtastic hop calculation, receive age/clock skew, transport, queue state, and position/last-heard freshness.
+- Added a bounded T-Deck capability-state service for GPS, magnetometer, SD, maps, touch, trackball, keyboard, and LoRa with independent unavailable/not-detected/degraded/ready states.
+- Added native test cases for time, hops, packet metadata, ACK/NAK, queue/freshness, and capability degradation.
+- Added ten secret-free fixed protobuf vectors covering public/channel text, position, NodeInfo, telemetry, traceroute, ACK/NAK, and BLE config request/completion boundaries, plus an independent host checker against the checked-in Nanopb bindings.
+- Added a fixed-capacity, chronological diagnostic event store for packet, queue, and position metadata; overflow evicts the oldest record and never retains payload text, keys, or coordinates.
+- Connected decoded packet and queue-status callbacks already delivered through the device UI controller to that store without changing send, routing, radio, or channel behavior.
+- Added a T-Deck-only Tools → FriendMesh Diagnostics view with runtime capability states and the eight newest redacted packet/queue/position records; it is created dynamically to avoid modifying generated EEZ screen files and uses existing semantic panel/button styles and focus handling.
+- Added one-second automatic D-01/D-02 refresh while either diagnostics view is open, plus a rollover-safe 60-second position-freshness probe that records only state/source/skew transitions unless a new position arrives.
+- Added D-02 semantic event details for port, destination, payload state, transport, hops, ACK/NAK, exact routing error enum, queue state, position source, and freshness. Node IDs, message bodies, keys, and coordinates are never retained or displayed.
+- Added a non-destructive Clear view boundary and a two-step SD-only plaintext export of every retained event, including records hidden by Clear view. The RAM store remains bounded to the newest 16 events. Exports are explicitly non-restorable and redact coordinates and node IDs while excluding message bodies and keys.
+- Verified the official firmware endpoint `54e0d8d0ab2ff56b3a9ce967e53f79e49af560fb` and protobuf endpoint `6b1ded439633cd03d4af85b44231b91d1d106278`; five critical local schemas match the official protobuf commit byte-for-byte by SHA-256.
+- `pio run -e t-deck-tft` passed twice after implementation; inherited warnings remain.
+- Native execution is environment-blocked before the FriendMesh suite by missing Portduino host prerequisites (`pkg-config`/`argp.h`). PKI/encrypted-air vectors, BLE/multihop physical tests, and six-theme/three-input evidence remain open, so Phase 1 stays unchecked.
+- Physical T-Deck testing confirmed an ordinary private Meshtastic channel can exchange text with a stock Meshtastic device. An initial direct PKI message reached the destination but returned `Routing_Error_NO_CHANNEL` (`6`), isolating stale/mismatched cached peer keys. After removing only the two peer NodeDB records and allowing fresh NodeInfo exchange, FriendMeshOS-to-stock PKI DM returned ACK/error `0`, stock-to-FriendMeshOS logged `PKI Decryption worked!`, rendered the text, and completed the reliable ACK exchange. This is a bidirectional PKI interoperability pass for the tested pair without factory reset or key regeneration.
+- The first D-01 diagnostics screen opened physically, but its compact abbreviations were not self-explanatory to the operator. D-02 now supplies semantic detail and exact error names; this replacement build still requires physical D-01/D-02 input/theme/export verification.
+- The stock map rendered, but synchronous Google fallback-tile retrieval caused unacceptable UI stalls. FriendMeshOS now compiles with online fallback tiles disabled while retaining SD/offline map rendering; later re-enablement requires asynchronous bounded fetching.
+- The full FriendMeshOS splash is embedded as a compressed application asset so normal firmware upload updates branding without an `uploadfs` operation or saved-config changes. Physical verification of the replacement build remains pending.
+- Operator verification passed for the application-embedded FriendMeshOS `v0.2.1` splash, nonblocking offline-only missing-tile map behavior, Signal Scanner/position request, and Trace Route on the tested FriendMeshOS/stock pair. The replacement build retained ordinary private-channel and bidirectional PKI interoperability.
+- Operator verification passed for D-02 older/newer navigation, non-destructive Clear view with all retained events still exported, all six themes, and touch/trackball/keyboard navigation. The inspected SD export contained all seven retained events and no coordinates, node IDs, message bodies, or keys.
+- BLE phone connection and configuration passed. That test exposed the startup splash being reused above the reboot chooser; the replacement build now hides every startup-only logo/version object before showing a separate dark FriendMeshOS device-controls screen with Restart, Pairing mode, Power off, and cancel guidance. Operator recheck confirmed the startup splash, chooser visibility, labels, focus/navigation, cancel, and device-control actions all work correctly.
+- Public-channel text was received from a node reported 13 km away. This is useful range/interoperability evidence but is not classified as controlled multihop without observed hop metadata or a deliberately isolated relay path.
+
 ### Phase 2 — FriendMesh protobuf and signing identity
 
 Build:
 
-- Define `friendmesh.proto` and Nanopb bounds.
-- Implement magic/version dispatch on `PRIVATE_APP`.
-- Implement canonical encoding and Ed25519 signing identity.
-- Bind signing identity to Meshtastic PKI verification transcript.
-- Implement replay cache, sender sequences, event IDs, signature verification, unknown-version rejection, and test vectors.
+- [x] Define `friendmesh.proto` and Nanopb bounds for a single payload no larger than 233 bytes.
+- [x] Implement magic/version dispatch on `PRIVATE_APP` without consuming unrelated private-app traffic.
+- [x] Implement domain-separated canonical encoding and ESP32-S3 Ed25519 primitives with a fail-closed boot self-test.
+- [x] Define and validate the signing-identity binding to the sender node and current Meshtastic X25519 public key.
+- [x] Implement bounded RAM replay cache, sender sequences, event IDs, signature verification, timestamp bounds, unknown-version/type rejection, and deterministic host checks.
+- [ ] Persist the signing seed and durable replay state through the reviewed Phase 3 encrypted-storage boundary.
+- [ ] Implement the signed transmit path and prove two-FriendMesh-device exchange.
 
 Design:
 
@@ -1157,10 +1193,14 @@ Design:
 
 Tests/gate:
 
-- Published crypto vectors.
-- Invalid/malleated/replayed/stale/wrong-group/wrong-epoch events rejected.
-- Fuzz protobuf decoding and bounds.
-- Stock Meshtastic traffic unaffected.
+- [x] Published RFC 8032 crypto vector passes independently; firmware embeds its own known-answer self-test.
+- [x] Invalid-signature, replayed, stale-sequence, stale/future-time, wrong-sender, wrong-group, and wrong-epoch events are rejected by the host protocol checker.
+- [x] Canonical frame round trips, unknown fields, unknown versions/types, maximum payload, and replay-capacity exhaustion are covered.
+- [ ] Fuzz protobuf decoding and bounds.
+- [ ] Confirm the firmware crypto self-test and receiver-ready log on physical T-Deck hardware.
+- [ ] Confirm stock Meshtastic traffic remains unaffected after this Phase 2 build.
+
+Implementation contract: [`docs/friendmesh/PHASE2_PROTOCOL_CONTRACT.md`](docs/friendmesh/PHASE2_PROTOCOL_CONTRACT.md). Phase 2 remains open until the identity UI/persistence, fuzzing, transmit exchange, physical regression, and theme/input gates pass.
 
 ### Phase 3 — Encrypted storage and transaction engine
 
@@ -1192,7 +1232,7 @@ Tests/gate:
 Build:
 
 - Group/member schemas, limits, alias rules, admin chain, epochs, status computation.
-- Four-group/channel-slot allocator.
+- Eight-group bounded domain store plus one-time shared-carrier allocator.
 - Protected-channel ownership and MQTT enforcement.
 - 90-day activity/expiration framework.
 - Local blocking.
@@ -1201,7 +1241,7 @@ Design:
 
 - Boot home, group chooser, empty/create/join tiles, dashboard, Members, Security.
 - Clear `Secure`, `Rekey pending`, `Unsafe config`, and `Storage degraded` states.
-- Group tiles validated at maximum name length and four-group density.
+- Group tiles validated at maximum name length and eight-group paged/scroll density.
 
 Tests/gate:
 
@@ -1495,7 +1535,7 @@ Build:
 
 - Threat-model closure.
 - Fuzzing, static checks, power-loss campaign, storage endurance, memory/stack/PSRAM profiling.
-- Airtime and battery measurements for eight members/four groups.
+- Airtime and battery measurements for eight members across eight configured groups.
 - Key-audit expiration and secure cleanup.
 - Accessibility/focus/contrast fixes.
 
@@ -1557,7 +1597,7 @@ Required campaigns:
 - Power loss at transaction boundaries.
 - Devices offline across rekey/history/disband.
 - Congested LongFast and slower presets.
-- Four groups and eight members.
+- Eight groups and eight members per group.
 - Public Meshtastic simultaneous traffic.
 - BLE reconnect/config attempts.
 - All six themes and all three input methods.
@@ -1569,7 +1609,7 @@ Required campaigns:
 ### Tier 1 — Required and feasible on T-Deck
 
 - Verified device identity and group aliases.
-- Four groups/eight members.
+- Eight groups/eight members per group.
 - FriendMesh-only signed group chat.
 - Strong random group PSKs and MQTT-off policy.
 - Admin/member roles and secure invitations.
@@ -1612,7 +1652,7 @@ Required campaigns:
 
 - Registered upstream FriendMesh port number.
 - Linux history keeper.
-- More than four groups or eight tested members.
+- More than eight groups or eight tested members per group.
 - Richer contact network.
 - Additional heading sensors and calibration UI.
 - Phone-side FriendMesh integration, only if a separate compatible app is ever built.

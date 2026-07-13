@@ -440,14 +440,14 @@ Configuration download is stateful: clients request config and receive owner, ch
 Use standard Meshtastic constructs:
 
 - One ordinary primary channel defines the RF parameters.
-- Each closed FriendMesh group maps to one enabled secondary channel.
+- All FriendMesh groups on one device share one managed secondary carrier channel.
 - Each group uses a random 32-byte AES-256 PSK.
 - Group chat and structured group events use a versioned FriendMesh application envelope on `PRIVATE_APP` so stock clients do not display group content even if they understand ordinary Meshtastic text.
 - Group location features consume standard Meshtastic position state while FriendMesh-specific sharing/freshness events remain inside the FriendMesh envelope.
-- One person can join multiple groups by enabling multiple secondary channels, subject to the firmware's channel-table capacity.
+- One device can join up to eight FriendMesh application groups without allocating another Meshtastic channel for each group.
 - Per-person private messages use standard PKI direct messaging when verified keys are available.
 
-FriendMesh metadata should be a versioned local record containing group ID, display name, channel index/reference, ordered verified device-member records, admin chain/epoch, location policy, meetup state, and schema version. It must not duplicate PSKs into ordinary metadata.
+FriendMesh metadata should be a versioned local record containing group ID, display name, carrier reference, opaque dispatch tag, ordered verified device-member records, admin chain/epoch, location policy, meetup state, and schema version. It must not duplicate group keys into ordinary metadata.
 
 ### Membership semantics
 
@@ -462,23 +462,25 @@ The UI must explain these boundaries honestly.
 
 ### Multiple-group receive and send
 
-All enabled secondary channels share the same RF traffic. On receive, the one-byte hash narrows candidate channel keys and successful decoding maps the packet to a local channel index. On send, the user explicitly selects a group/channel. Do not scan separate frequencies per group.
+All enabled secondary channels share the same RF traffic. FriendMesh selects its single carrier channel, then dispatches a successfully decoded `PRIVATE_APP` envelope to one of up to eight application groups using a bounded opaque tag. The carrier PSK does not provide group isolation; inner authenticated encryption and signed current-epoch membership do. Do not scan separate frequencies or allocate separate channels per group.
 
 If channel-table capacity is exhausted, FriendMeshOS must refuse creation/import with a clear explanation. It must not silently overwrite another channel.
 
 ### Group discovery and joining
 
-Recommended flow:
+The approved FriendMesh admission protocol supersedes the earlier channel-URL-only MVP idea. A channel URL remains a Meshtastic compatibility and advanced-recovery mechanism; possessing or importing one never creates approved FriendMesh membership.
 
-1. Group owner creates a secondary channel with secure random PSK and position precision.
-2. Existing Meshtastic channel URL encodes shareable channel configuration.
-3. Recipient previews name, channel slot impact, privacy settings, and whether an existing slot will change.
-4. Recipient explicitly confirms import.
-5. FriendMesh local metadata is created referencing the resulting channel.
-6. Nodes exchange standard NodeInfo and Position messages.
-7. Members optionally perform per-peer key verification for trusted DMs.
+Approved flow:
 
-No FriendMesh-specific over-air join protocol is needed for the MVP.
+1. Any approved member opens a nearby invitation and keeps the six-character code screen active.
+2. A candidate enters that code and a unique group alias, accepts the precise-or-hidden location policy, and acknowledges the pre-join history disclosure.
+3. The candidate submits its node number, Meshtastic X25519 public-key fingerprint, FriendMesh Ed25519 signing key, and proof of key possession.
+4. The administrator reviews the candidate and inviter, checks group and channel capacity, and performs in-person security-number verification.
+5. Admin approval commits a signed membership event for the current epoch and produces an identity-bound group-key grant for that candidate.
+6. The candidate becomes approved only after validating the signed event and current-epoch grant; no unverified candidate receives the group PSK.
+7. The group then uses inner-encrypted FriendMesh envelopes over the shared carrier. Group-private position state also stays inside the FriendMesh envelope rather than relying on a carrier-visible standard Position packet.
+
+Closing the inviter's screen stops new submissions but does not discard requests already awaiting admin review. The invitation code is discovery material, not an access credential. Stock client configuration must not bypass approval, and FriendMesh-owned channels are protected from stock-client edit/delete except through the deliberate advanced recovery flow.
 
 ### Compass and map data model
 
@@ -492,7 +494,7 @@ For each group member resolve:
 - Last observed hop count and observation age.
 - Optional last traceroute result, forward/return path, and age.
 
-Map markers must be grouped/filterable by FriendMesh group, but a person in several groups should remain one node identity with multiple group badges—not duplicated physical people.
+Map markers must be grouped/filterable by FriendMesh group, but one device in several groups remains one physical node marker with multiple group badges rather than duplicated markers. One human carrying multiple enrolled devices still appears as multiple device identities.
 
 ### SOS architecture
 
@@ -530,7 +532,7 @@ These are compatibility boundaries. Build the group and compass experience above
 
 ### Phase C: FriendMesh group chat and joining
 
-- Create/import secondary channels through existing config APIs.
+- Create/import the single managed carrier through existing channel config APIs.
 - Bind group chat to the versioned signed FriendMesh application envelope while preserving ordinary Meshtastic text in the separate Meshtastic area.
 - Surface channel capacity and PSK-rotation implications.
 - Test with unmodified Meshtastic nodes and phone clients.

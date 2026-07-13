@@ -1,0 +1,10 @@
+# FriendMesh v1 is bounded to fit one Meshtastic Data payload (233 bytes).
+
+*FriendMeshSignedFields.group_id max_size:16 fixed_length:true
+*FriendMeshSignedFields.event_id max_size:16 fixed_length:true
+*FriendMeshSignedFields.signing_public_key max_size:32 fixed_length:true
+*FriendMeshSignedFields.payload max_size:48
+
+*FriendMeshEnvelope.signature max_size:64 fixed_length:true
+
+*FriendMeshIdentityBinding.meshtastic_public_key max_size:32 fixed_length:true

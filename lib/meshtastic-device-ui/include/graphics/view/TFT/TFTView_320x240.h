@@ -2,6 +2,10 @@
 
 #include "graphics/common/MeshtasticView.h"
 #include "meshtastic/clientonly.pb.h"
+#if defined(FRIENDMESHOS_TDECK)
+#include "friendmesh/observability/DiagnosticEventStore.h"
+#include "friendmesh/platform/TDeckCapabilityService.h"
+#endif
 #include <set>
 
 class MapPanel;
@@ -35,6 +39,7 @@ class TFTView_320x240 : public MeshtasticView
     void updateSignalStrength(uint32_t nodeNum, int32_t rssi, float snr) override;
     void updateHopsAway(uint32_t nodeNum, uint8_t hopsAway) override;
     void updateConnectionStatus(const meshtastic_DeviceConnectionStatus &status) override;
+    void updateQueueStatus(const meshtastic_QueueStatus &status) override;
 
     // methods to update device config
     void updateChannelConfig(const meshtastic_Channel &ch) override;
@@ -212,6 +217,16 @@ class TFTView_320x240 : public MeshtasticView
 
     void enterProgrammingMode(void);
     void updateTheme(void);
+#if defined(FRIENDMESHOS_TDECK)
+    void createFriendMeshDiagnostics(void);
+    void refreshFriendMeshDiagnostics(void);
+    void refreshFriendMeshDiagnosticDetail(void);
+    void recordFriendMeshPositionFreshness(bool force);
+    size_t visibleFriendMeshDiagnosticCount(void) const;
+    const friendmesh::observability::DiagnosticEvent *visibleFriendMeshDiagnosticEvent(size_t index) const;
+    bool exportFriendMeshDiagnostics(char *path, size_t pathSize);
+    void resetFriendMeshExportConfirmation(void);
+#endif
     void ui_events_init(void);
     void ui_set_active(lv_obj_t *b, lv_obj_t *p, lv_obj_t *tp);
     void showKeyboard(lv_obj_t *textArea);
@@ -359,6 +374,16 @@ class TFTView_320x240 : public MeshtasticView
     static void ui_event_node_details(lv_event_t *e);
     static void ui_event_statistics(lv_event_t *e);
     static void ui_event_packet_log(lv_event_t *e);
+#if defined(FRIENDMESHOS_TDECK)
+    static void ui_event_friendmesh_diagnostics(lv_event_t *e);
+    static void ui_event_friendmesh_diagnostics_back(lv_event_t *e);
+    static void ui_event_friendmesh_diagnostics_detail(lv_event_t *e);
+    static void ui_event_friendmesh_diagnostics_detail_back(lv_event_t *e);
+    static void ui_event_friendmesh_diagnostics_older(lv_event_t *e);
+    static void ui_event_friendmesh_diagnostics_newer(lv_event_t *e);
+    static void ui_event_friendmesh_diagnostics_clear_view(lv_event_t *e);
+    static void ui_event_friendmesh_diagnostics_export(lv_event_t *e);
+#endif
 
     static void ui_event_pin_screen_button(lv_event_t *e);
     static void ui_event_statistics_table(lv_event_t *e);
@@ -392,6 +417,38 @@ class TFTView_320x240 : public MeshtasticView
     lv_obj_t *activeWidget = nullptr;
     lv_obj_t *activeTextInput = nullptr;
     lv_group_t *input_group = nullptr;
+#if defined(FRIENDMESHOS_TDECK)
+    lv_obj_t *friendMeshDiagnosticsButton = nullptr;
+    lv_obj_t *friendMeshDiagnosticsPanel = nullptr;
+    lv_obj_t *friendMeshDiagnosticsTopPanel = nullptr;
+    lv_obj_t *friendMeshDiagnosticsLabel = nullptr;
+    lv_obj_t *friendMeshDiagnosticsDetailButton = nullptr;
+    lv_obj_t *friendMeshDiagnosticsBackButton = nullptr;
+    lv_obj_t *friendMeshDiagnosticDetailPanel = nullptr;
+    lv_obj_t *friendMeshDiagnosticDetailTopPanel = nullptr;
+    lv_obj_t *friendMeshDiagnosticDetailLabel = nullptr;
+    lv_obj_t *friendMeshDiagnosticOlderButton = nullptr;
+    lv_obj_t *friendMeshDiagnosticNewerButton = nullptr;
+    lv_obj_t *friendMeshDiagnosticClearButton = nullptr;
+    lv_obj_t *friendMeshDiagnosticExportButton = nullptr;
+    lv_obj_t *friendMeshDiagnosticExportButtonLabel = nullptr;
+    lv_obj_t *friendMeshDiagnosticDetailBackButton = nullptr;
+    friendmesh::observability::DiagnosticEventStore friendMeshDiagnostics;
+    char friendMeshDiagnosticsBuffer[768] = {};
+    char friendMeshDiagnosticDetailBuffer[768] = {};
+    uint32_t friendMeshDiagnosticMinimumSequence = 0;
+    uint32_t friendMeshDiagnosticRefreshMs = 0;
+    uint32_t friendMeshPositionProbeMs = 0;
+    uint32_t friendMeshLastPositionTimestamp = 0;
+    uint32_t friendMeshLastHeardTimestamp = 0;
+    size_t friendMeshDiagnosticSelection = 0;
+    bool friendMeshHasObservedPosition = false;
+    bool friendMeshHasPositionSnapshot = false;
+    bool friendMeshDiagnosticFollowLatest = true;
+    bool friendMeshDiagnosticExportConfirm = false;
+    meshtastic_Position_LocSource friendMeshPositionSource = meshtastic_Position_LocSource_LOC_UNSET;
+    friendmesh::observability::PositionObservation friendMeshLastPositionObservation;
+#endif
 
     enum BasicSettings activeSettings = eNone; // active settings menu (used to disable other button presses)
 

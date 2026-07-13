@@ -26,7 +26,7 @@ pointer. It is intentionally independent of any one optional theme.
 
 - `friendmeshos-logo.svg` is the editable master logo and wordmark.
 - `friendmeshos-mark-30x17.png` previews the top-bar mark.
-- `logo_320x240.png` is the T-Deck startup splash embedded in LittleFS.
+- `logo_320x240.png` is the T-Deck startup splash embedded in the application firmware.
 - `reference/friendmeshos-brand-board.png` records the generated visual
   direction derived from the six confirmed design references.
 - `generate_friendmeshos_assets.py` regenerates the derived PNG and LVGL
@@ -76,6 +76,8 @@ fonts, decoration, and touch-target changes require separate device testing.
 
 - `FRIENDMESHOS_TDECK` gates FriendMeshOS branding in the shared vendored UI.
 - `FRIENDMESHOS_VERSION` is defined only by `t-deck-tft`.
+- The startup splash does not depend on LittleFS, so normal application uploads update it without touching saved configuration.
+- The full splash and its live version labels are startup-only. Reboot, pairing-mode, shutdown, recovery, and confirmation choices must use dedicated opaque panels and must explicitly hide startup artwork before becoming interactive.
 - Meshtastic protobuf names, protocol URLs, QR payloads, BLE behavior, and
   interoperability identifiers are not branding targets.
 - The top-bar mark is monochrome RGB565A8 and is recolored at runtime by the

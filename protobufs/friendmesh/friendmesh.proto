@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package friendmesh;
+
+// The frame prefix outside this protobuf is ASCII "FMSH" followed by one
+// protocol-version byte. The same version is signed inside the message.
+
+enum FriendMeshEventType {
+  FRIENDMESH_EVENT_UNSPECIFIED = 0;
+  FRIENDMESH_EVENT_IDENTITY_BINDING = 1;
+  FRIENDMESH_EVENT_PROTOCOL_PROBE = 2;
+}
+
+// These fields are encoded deterministically and signed with Ed25519.
+// The signing key is intentionally separate from Meshtastic's X25519 key.
+message FriendMeshSignedFields {
+  fixed32 protocol_version = 1;
+  bytes group_id = 2;
+  fixed32 group_epoch = 3;
+  fixed32 sender_node = 4;
+  fixed64 sender_sequence = 5;
+  bytes event_id = 6;
+  fixed64 created_at = 7;
+  FriendMeshEventType event_type = 8;
+  bytes signing_public_key = 9;
+  bytes payload = 10;
+}
+
+message FriendMeshEnvelope {
+  FriendMeshSignedFields signed_fields = 1;
+  bytes signature = 2;
+}
+
+// Payload for FRIENDMESH_EVENT_IDENTITY_BINDING. In-person verification binds
+// this Meshtastic X25519 public key to signed_fields.signing_public_key.
+message FriendMeshIdentityBinding {
+  bytes meshtastic_public_key = 1;
+  fixed32 key_generation = 2;
+}

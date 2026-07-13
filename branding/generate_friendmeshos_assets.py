@@ -133,12 +133,16 @@ def rgb565a8_bytes(image: Image.Image) -> list[int]:
     return rgb565 + alpha
 
 
-def render_cpp(image: Image.Image) -> None:
-    values = rgb565a8_bytes(image)
+def c_array(values: bytes | list[int]) -> str:
     rows = []
     for index in range(0, len(values), 24):
         rows.append("    " + ", ".join(f"0x{value:02x}" for value in values[index : index + 24]) + ",")
-    data = "\n".join(rows)
+    return "\n".join(rows)
+
+
+def render_cpp(image: Image.Image) -> None:
+    mark_data = c_array(rgb565a8_bytes(image))
+    splash_data = c_array(SPLASH_PNG.read_bytes())
     MARK_CPP.write_text(
         textwrap.dedent(
             f"""\
@@ -151,7 +155,11 @@ def render_cpp(image: Image.Image) -> None:
             #endif
 
             static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST uint8_t friendmeshos_mark_map[] = {{
-            {data}
+            {mark_data}
+            }};
+
+            static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST uint8_t friendmeshos_splash_map[] = {{
+            {splash_data}
             }};
 
             const lv_image_dsc_t friendmeshos_mark_image = [] {{
@@ -164,6 +172,19 @@ def render_cpp(image: Image.Image) -> None:
                 descriptor.header.stride = 60;
                 descriptor.data_size = sizeof(friendmeshos_mark_map);
                 descriptor.data = friendmeshos_mark_map;
+                return descriptor;
+            }}();
+
+            const lv_image_dsc_t friendmeshos_splash_image = [] {{
+                lv_image_dsc_t descriptor{{}};
+                descriptor.header.magic = LV_IMAGE_HEADER_MAGIC;
+                descriptor.header.cf = LV_COLOR_FORMAT_RAW_ALPHA;
+                descriptor.header.flags = 0;
+                descriptor.header.w = 320;
+                descriptor.header.h = 240;
+                descriptor.header.stride = 0;
+                descriptor.data_size = sizeof(friendmeshos_splash_map);
+                descriptor.data = friendmeshos_splash_map;
                 return descriptor;
             }}();
 

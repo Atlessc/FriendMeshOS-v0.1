@@ -13,7 +13,7 @@ size and can be recolored using the active theme.
 
 - `friendmeshos-logo.svg` — editable master mark and wordmark.
 - `friendmeshos-mark-30x17.png` — preview of the embedded top-bar mark.
-- `logo_320x240.png` — T-Deck startup splash copied into LittleFS.
+- `logo_320x240.png` — T-Deck startup splash embedded in the application firmware.
 - `generate_friendmeshos_assets.py` — reproducibly generates the PNG assets
   and the LVGL RGB565A8 mark used by the T-Deck UI.
 
@@ -26,6 +26,12 @@ python3 branding/generate_friendmeshos_assets.py
 The splash intentionally leaves the bottom portion visually quiet. Firmware
 draws the FriendMeshOS version and upstream Meshtastic base version at runtime,
 so build information stays accurate without regenerating the bitmap.
+
+The generated C++ asset contains the compressed PNG so a normal application
+upload updates the splash without writing LittleFS or changing saved settings.
+
+The splash is used only during startup. Device-control and reboot choices use a
+separate opaque screen so startup artwork can never cover interactive options.
 
 Do not add other-resolution FriendMeshOS logos until another device target is
 explicitly brought into scope.

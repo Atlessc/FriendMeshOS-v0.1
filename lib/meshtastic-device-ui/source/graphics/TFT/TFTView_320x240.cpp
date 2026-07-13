@@ -13,7 +13,9 @@
 #include "graphics/map/URLService.h"
 #include "graphics/view/TFT/Themes.h"
 #if defined(FRIENDMESHOS_TDECK)
+#include "friendmesh/observability/DiagnosticFormatter.h"
 #include "graphics/view/TFT/FriendMeshBranding.h"
+#include "mesh/Throttle.h"
 #endif
 #include "images.h"
 #include "input/InputDriver.h"
@@ -181,110 +183,62 @@ void TFTView_320x240::init(IClientBase *client)
     FileLoader::init(&fileSystem);
 
 #if defined(FRIENDMESHOS_TDECK)
+    lv_image_set_src(objects.boot_logo, &friendmeshos_splash_image);
+    lv_obj_set_pos(objects.boot_logo, 0, 0);
+    lv_img_set_zoom(objects.boot_logo, 256);
 
-    const bool bootImageLoaded =
-        FileLoader::loadBootImage(objects.boot_logo);
+    char version[32];
+    char upstream[32];
+    lv_snprintf(version, sizeof(version), "FriendMeshOS v%s", FRIENDMESHOS_STRINGIFY(FRIENDMESHOS_VERSION));
+    lv_snprintf(upstream, sizeof(upstream), "Meshtastic %s base", firmware_version);
+    lv_label_set_text(objects.meshtastic_url, version);
+    lv_label_set_text(objects.firmware_label, upstream);
+    lv_obj_remove_flag(objects.meshtastic_url, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(objects.firmware_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_text_font(objects.meshtastic_url, &ui_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(objects.meshtastic_url, lv_color_hex(0x22D3EE), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(objects.firmware_label, lv_color_hex(0x94A3B8), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_move_foreground(objects.boot_logo);
+    lv_obj_move_foreground(objects.meshtastic_url);
+    lv_obj_move_foreground(objects.firmware_label);
 
-    /*
-     * The FriendMeshOS PNG is a complete 320x240 splash screen. When it
-     * loads successfully, it should replace the entire inherited Meshtastic
-     * boot layout rather than only replacing the small logo object.
-     */
-    if (bootImageLoaded) {
-        lv_obj_set_pos(objects.boot_logo, 0, 0);
-        lv_img_set_zoom(objects.boot_logo, 256);
+    constexpr uint32_t rebootBackground = 0x07111F;
+    constexpr uint32_t rebootPressedBackground = 0x0B2239;
+    constexpr uint32_t rebootText = 0xF8FAFC;
+    constexpr uint32_t rebootMutedText = 0x94A3B8;
+    lv_obj_set_style_bg_color(objects.reboot_panel, lv_color_hex(rebootBackground), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(objects.reboot_panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(objects.cancel_reboot_button, lv_color_hex(rebootBackground),
+                              LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(objects.cancel_reboot_button, lv_color_hex(rebootPressedBackground),
+                              LV_PART_MAIN | LV_STATE_PRESSED);
 
-        /*
-         * The full FriendMeshOS splash already contains its own title and
-         * tagline, so hide the inherited Meshtastic boot labels.
-         */
-        lv_obj_add_flag(
-            objects.meshtastic_url,
-            LV_OBJ_FLAG_HIDDEN
-        );
+    lv_label_set_text(objects.obj0, "FriendMeshOS device controls");
+    lv_obj_set_pos(objects.obj0, 0, 18);
+    lv_obj_set_style_align(objects.obj0, LV_ALIGN_TOP_MID, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(objects.obj0, &ui_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(objects.obj0, lv_color_hex(rebootText), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-        lv_obj_add_flag(
-            objects.firmware_label,
-            LV_OBJ_FLAG_HIDDEN
-        );
+    auto addRebootLabel = [rebootText](const char *text, int32_t x) {
+        lv_obj_t *label = lv_label_create(objects.reboot_panel);
+        lv_obj_set_size(label, 90, LV_SIZE_CONTENT);
+        lv_label_set_text(label, text);
+        lv_obj_set_pos(label, x, 48);
+        lv_obj_set_style_align(label, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(label, lv_color_hex(rebootText), LV_PART_MAIN | LV_STATE_DEFAULT);
+    };
+    addRebootLabel("Restart", -75);
+    addRebootLabel("Pairing mode", 0);
+    addRebootLabel("Power off", 75);
 
-        /*
-         * Keep the full-screen image above the generated boot-screen
-         * background and inherited decorative elements.
-         */
-        lv_obj_move_foreground(objects.boot_logo);
-    } else {
-        /*
-         * Emergency fallback used only when /boot/logo.png cannot be loaded.
-         * This still produces a FriendMeshOS-branded boot screen instead of
-         * returning to the embedded Meshtastic logo.
-         */
-        lv_image_set_src(
-            objects.boot_logo,
-            &friendmeshos_mark_image
-        );
-
-        lv_img_set_zoom(objects.boot_logo, 768);
-
-        char version[32];
-        char upstream[32];
-
-        lv_snprintf(
-            version,
-            sizeof(version),
-            "FriendMeshOS v%s",
-            FRIENDMESHOS_STRINGIFY(FRIENDMESHOS_VERSION)
-        );
-
-        lv_snprintf(
-            upstream,
-            sizeof(upstream),
-            "Meshtastic %s base",
-            firmware_version
-        );
-
-        lv_label_set_text(
-            objects.meshtastic_url,
-            version
-        );
-
-        lv_label_set_text(
-            objects.firmware_label,
-            upstream
-        );
-
-        lv_obj_remove_flag(
-            objects.meshtastic_url,
-            LV_OBJ_FLAG_HIDDEN
-        );
-
-        lv_obj_remove_flag(
-            objects.firmware_label,
-            LV_OBJ_FLAG_HIDDEN
-        );
-
-        lv_obj_set_style_text_font(
-            objects.meshtastic_url,
-            &ui_font_montserrat_14,
-            LV_PART_MAIN | LV_STATE_DEFAULT
-        );
-
-        lv_obj_set_style_text_color(
-            objects.meshtastic_url,
-            lv_color_hex(0x22D3EE),
-            LV_PART_MAIN | LV_STATE_DEFAULT
-        );
-
-        lv_obj_set_style_text_color(
-            objects.firmware_label,
-            lv_color_hex(0x94A3B8),
-            LV_PART_MAIN | LV_STATE_DEFAULT
-        );
-
-        lv_obj_move_foreground(objects.boot_logo);
-        lv_obj_move_foreground(objects.meshtastic_url);
-        lv_obj_move_foreground(objects.firmware_label);
-    }
+    lv_obj_t *cancelHint = lv_label_create(objects.reboot_panel);
+    lv_obj_set_size(cancelHint, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_label_set_text(cancelHint, "Tap the background to cancel");
+    lv_obj_set_pos(cancelHint, 0, -18);
+    lv_obj_set_style_align(cancelHint, LV_ALIGN_BOTTOM_MID, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_align(cancelHint, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(cancelHint, lv_color_hex(rebootMutedText), LV_PART_MAIN | LV_STATE_DEFAULT);
 
 #else
 
@@ -483,8 +437,15 @@ bool TFTView_320x240::setupUIConfig(const meshtastic_DeviceUIConfig &uiconfig)
  */
 void TFTView_320x240::updateBootMessage(const char *msg)
 {
+#if defined(FRIENDMESHOS_TDECK)
+    (void)msg;
+    char upstream[32];
+    lv_snprintf(upstream, sizeof(upstream), "Meshtastic %s base", firmware_version);
+    lv_label_set_text(objects.firmware_label, upstream);
+#else
     if (msg)
         lv_label_set_text(objects.firmware_label, msg);
+#endif
 }
 
 /**
@@ -503,6 +464,7 @@ void TFTView_320x240::init_screens(void)
     lv_dropdown_set_options(objects.settings_theme_dropdown,
                             "Clean Modern Field Tool\nRetro Handheld Terminal\nBold Neobrutalist Utility\nOrbital Mission "
                             "Control\nAlpine Daylight Navigator\nFriendly Mesh Constellation");
+    createFriendMeshDiagnostics();
 #endif
     apply_hotfix();
 
@@ -803,6 +765,376 @@ void TFTView_320x240::apply_hotfix(void)
     lv_obj_add_style(objects.settings_restore_checkbox, &style_radio, LV_PART_INDICATOR);
 }
 
+#if defined(FRIENDMESHOS_TDECK)
+static const char *capabilityStateName(friendmesh::platform::CapabilityState state)
+{
+    switch (state) {
+    case friendmesh::platform::CapabilityState::READY:
+        return "READY";
+    case friendmesh::platform::CapabilityState::DEGRADED:
+        return "DEGRADED";
+    case friendmesh::platform::CapabilityState::NOT_DETECTED:
+        return "NOT FOUND";
+    default:
+        return "N/A";
+    }
+}
+
+static const char *destinationName(friendmesh::observability::DestinationType destination)
+{
+    switch (destination) {
+    case friendmesh::observability::DestinationType::DIRECT:
+        return "DIRECT";
+    case friendmesh::observability::DestinationType::BROADCAST:
+        return "BCAST";
+    case friendmesh::observability::DestinationType::LOCAL_TRANSPORT_BROADCAST:
+        return "LOCAL";
+    default:
+        return "INVALID";
+    }
+}
+
+static const char *queueStateName(friendmesh::observability::QueueState state)
+{
+    switch (state) {
+    case friendmesh::observability::QueueState::READY:
+        return "READY";
+    case friendmesh::observability::QueueState::FULL:
+        return "FULL";
+    case friendmesh::observability::QueueState::INVALID:
+        return "INVALID";
+    default:
+        return "N/A";
+    }
+}
+
+static const char *freshnessName(friendmesh::observability::Freshness freshness)
+{
+    switch (freshness) {
+    case friendmesh::observability::Freshness::FRESH:
+        return "FRESH";
+    case friendmesh::observability::Freshness::STALE:
+        return "STALE";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+void TFTView_320x240::createFriendMeshDiagnostics(void)
+{
+    friendMeshDiagnosticsButton = lv_btn_create(objects.tab_page_tools);
+    lv_obj_set_size(friendMeshDiagnosticsButton, LV_PCT(95), 30);
+    add_style_settings_button_style(friendMeshDiagnosticsButton);
+    lv_obj_set_style_align(friendMeshDiagnosticsButton, LV_ALIGN_TOP_MID, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_width(friendMeshDiagnosticsButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_t *buttonLabel = lv_label_create(friendMeshDiagnosticsButton);
+    lv_obj_set_width(buttonLabel, LV_PCT(100));
+    lv_label_set_long_mode(buttonLabel, LV_LABEL_LONG_DOT);
+    lv_label_set_text(buttonLabel, "FriendMesh Diagnostics");
+    lv_obj_set_style_align(buttonLabel, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_align(buttonLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    friendMeshDiagnosticsPanel = lv_obj_create(objects.main_screen);
+    lv_obj_set_pos(friendMeshDiagnosticsPanel, LV_PCT(12), LV_PCT(10));
+    lv_obj_set_size(friendMeshDiagnosticsPanel, LV_PCT(88), LV_PCT(90));
+    lv_obj_add_flag(friendMeshDiagnosticsPanel, LV_OBJ_FLAG_HIDDEN);
+    add_style_panel_style(friendMeshDiagnosticsPanel);
+    lv_obj_set_style_layout(friendMeshDiagnosticsPanel, LV_LAYOUT_FLEX, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_flex_flow(friendMeshDiagnosticsPanel, LV_FLEX_FLOW_COLUMN, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(friendMeshDiagnosticsPanel, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_row(friendMeshDiagnosticsPanel, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    friendMeshDiagnosticsLabel = lv_label_create(friendMeshDiagnosticsPanel);
+    lv_obj_set_width(friendMeshDiagnosticsLabel, LV_PCT(100));
+    lv_label_set_long_mode(friendMeshDiagnosticsLabel, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(friendMeshDiagnosticsLabel, "No diagnostic events yet");
+
+    friendMeshDiagnosticsDetailButton = lv_btn_create(friendMeshDiagnosticsPanel);
+    lv_obj_set_size(friendMeshDiagnosticsDetailButton, LV_PCT(95), 30);
+    add_style_settings_button_style(friendMeshDiagnosticsDetailButton);
+    lv_obj_t *detailsLabel = lv_label_create(friendMeshDiagnosticsDetailButton);
+    lv_label_set_text(detailsLabel, "Event details");
+    lv_obj_set_style_align(detailsLabel, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    friendMeshDiagnosticsBackButton = lv_btn_create(friendMeshDiagnosticsPanel);
+    lv_obj_set_size(friendMeshDiagnosticsBackButton, LV_PCT(95), 30);
+    add_style_settings_button_style(friendMeshDiagnosticsBackButton);
+    lv_obj_t *backLabel = lv_label_create(friendMeshDiagnosticsBackButton);
+    lv_label_set_text(backLabel, "Back");
+    lv_obj_set_style_align(backLabel, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    friendMeshDiagnosticsTopPanel = lv_obj_create(objects.main_screen);
+    lv_obj_set_pos(friendMeshDiagnosticsTopPanel, LV_PCT(12), 0);
+    lv_obj_set_size(friendMeshDiagnosticsTopPanel, LV_PCT(80), LV_PCT(10));
+    lv_obj_add_flag(friendMeshDiagnosticsTopPanel, LV_OBJ_FLAG_HIDDEN);
+    add_style_top_panel_style(friendMeshDiagnosticsTopPanel);
+    lv_obj_set_style_border_width(friendMeshDiagnosticsTopPanel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_t *topLabel = lv_label_create(friendMeshDiagnosticsTopPanel);
+    lv_label_set_text(topLabel, "FriendMesh Diagnostics");
+    lv_obj_set_style_align(topLabel, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    friendMeshDiagnosticDetailPanel = lv_obj_create(objects.main_screen);
+    lv_obj_set_pos(friendMeshDiagnosticDetailPanel, LV_PCT(12), LV_PCT(10));
+    lv_obj_set_size(friendMeshDiagnosticDetailPanel, LV_PCT(88), LV_PCT(90));
+    lv_obj_add_flag(friendMeshDiagnosticDetailPanel, LV_OBJ_FLAG_HIDDEN);
+    add_style_panel_style(friendMeshDiagnosticDetailPanel);
+    lv_obj_set_style_layout(friendMeshDiagnosticDetailPanel, LV_LAYOUT_FLEX, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_flex_flow(friendMeshDiagnosticDetailPanel, LV_FLEX_FLOW_COLUMN, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(friendMeshDiagnosticDetailPanel, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_row(friendMeshDiagnosticDetailPanel, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    friendMeshDiagnosticDetailLabel = lv_label_create(friendMeshDiagnosticDetailPanel);
+    lv_obj_set_width(friendMeshDiagnosticDetailLabel, LV_PCT(100));
+    lv_label_set_long_mode(friendMeshDiagnosticDetailLabel, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(friendMeshDiagnosticDetailLabel, "No visible diagnostic events");
+
+    auto createDetailButton = [this](lv_obj_t **button, const char *text) {
+        *button = lv_btn_create(friendMeshDiagnosticDetailPanel);
+        lv_obj_set_size(*button, LV_PCT(95), 30);
+        add_style_settings_button_style(*button);
+        lv_obj_t *label = lv_label_create(*button);
+        lv_label_set_text(label, text);
+        lv_obj_set_style_align(label, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        return label;
+    };
+
+    createDetailButton(&friendMeshDiagnosticOlderButton, "Older event");
+    createDetailButton(&friendMeshDiagnosticNewerButton, "Newer event");
+    createDetailButton(&friendMeshDiagnosticClearButton, "Clear view");
+    friendMeshDiagnosticExportButtonLabel =
+        createDetailButton(&friendMeshDiagnosticExportButton, "Export all stored events");
+    createDetailButton(&friendMeshDiagnosticDetailBackButton, "Back");
+
+    friendMeshDiagnosticDetailTopPanel = lv_obj_create(objects.main_screen);
+    lv_obj_set_pos(friendMeshDiagnosticDetailTopPanel, LV_PCT(12), 0);
+    lv_obj_set_size(friendMeshDiagnosticDetailTopPanel, LV_PCT(80), LV_PCT(10));
+    lv_obj_add_flag(friendMeshDiagnosticDetailTopPanel, LV_OBJ_FLAG_HIDDEN);
+    add_style_top_panel_style(friendMeshDiagnosticDetailTopPanel);
+    lv_obj_set_style_border_width(friendMeshDiagnosticDetailTopPanel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_t *detailTopLabel = lv_label_create(friendMeshDiagnosticDetailTopPanel);
+    lv_label_set_text(detailTopLabel, "Diagnostic Event Detail");
+    lv_obj_set_style_align(detailTopLabel, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+}
+
+size_t TFTView_320x240::visibleFriendMeshDiagnosticCount(void) const
+{
+    size_t visible = 0;
+    for (size_t index = 0; index < friendMeshDiagnostics.size(); index++) {
+        const auto *event = friendMeshDiagnostics.at(index);
+        if (event && event->sequence >= friendMeshDiagnosticMinimumSequence) {
+            visible++;
+        }
+    }
+    return visible;
+}
+
+const friendmesh::observability::DiagnosticEvent *TFTView_320x240::visibleFriendMeshDiagnosticEvent(size_t index) const
+{
+    size_t visible = 0;
+    for (size_t storedIndex = 0; storedIndex < friendMeshDiagnostics.size(); storedIndex++) {
+        const auto *event = friendMeshDiagnostics.at(storedIndex);
+        if (!event || event->sequence < friendMeshDiagnosticMinimumSequence) {
+            continue;
+        }
+        if (visible++ == index) {
+            return event;
+        }
+    }
+    return nullptr;
+}
+
+void TFTView_320x240::resetFriendMeshExportConfirmation(void)
+{
+    friendMeshDiagnosticExportConfirm = false;
+    if (friendMeshDiagnosticExportButtonLabel) {
+        lv_label_set_text(friendMeshDiagnosticExportButtonLabel,
+                          cardDetected ? "Export all stored events" : "Export requires SD");
+    }
+}
+
+void TFTView_320x240::refreshFriendMeshDiagnosticDetail(void)
+{
+    if (friendMeshDiagnosticExportConfirm) {
+        return;
+    }
+
+    const size_t count = visibleFriendMeshDiagnosticCount();
+    if (count == 0) {
+        friendMeshDiagnosticSelection = 0;
+        lv_label_set_text(friendMeshDiagnosticDetailLabel,
+                          "No visible events\n\nClear view did not delete stored records. New events will appear here.");
+        lv_obj_add_state(friendMeshDiagnosticOlderButton, LV_STATE_DISABLED);
+        lv_obj_add_state(friendMeshDiagnosticNewerButton, LV_STATE_DISABLED);
+        lv_obj_set_state(friendMeshDiagnosticExportButton, LV_STATE_DISABLED,
+                         !cardDetected || friendMeshDiagnostics.size() == 0);
+        return;
+    }
+
+    lv_obj_set_state(friendMeshDiagnosticExportButton, LV_STATE_DISABLED, !cardDetected);
+    if (friendMeshDiagnosticFollowLatest || friendMeshDiagnosticSelection >= count) {
+        friendMeshDiagnosticSelection = count - 1;
+    }
+
+    const auto *event = visibleFriendMeshDiagnosticEvent(friendMeshDiagnosticSelection);
+    if (!event || !friendmesh::observability::formatDiagnosticEvent(
+                      *event, friendMeshDiagnosticDetailBuffer, sizeof(friendMeshDiagnosticDetailBuffer))) {
+        lv_label_set_text(friendMeshDiagnosticDetailLabel, "Unable to format diagnostic event");
+        return;
+    }
+
+    lv_label_set_text(friendMeshDiagnosticDetailLabel, friendMeshDiagnosticDetailBuffer);
+    lv_obj_set_state(friendMeshDiagnosticOlderButton, LV_STATE_DISABLED, friendMeshDiagnosticSelection == 0);
+    lv_obj_set_state(friendMeshDiagnosticNewerButton, LV_STATE_DISABLED, friendMeshDiagnosticSelection + 1 >= count);
+}
+
+bool TFTView_320x240::exportFriendMeshDiagnostics(char *path, size_t pathSize)
+{
+#if defined(HAS_SDCARD) || defined(HAS_SD_MMC) || defined(ARCH_PORTDUINO)
+    if (!cardDetected || !path || pathSize == 0 || friendMeshDiagnostics.size() == 0) {
+        return false;
+    }
+
+    SDFs.mkdir("/friendmesh");
+    const uint32_t stamp = VALID_TIME(actTime) ? static_cast<uint32_t>(actTime) : millis() / 1000U;
+    bool available = false;
+    for (uint8_t suffix = 0; suffix < 100; suffix++) {
+        std::snprintf(path, pathSize, "/friendmesh/diagnostics_%lu_%02u.txt", static_cast<unsigned long>(stamp),
+                      static_cast<unsigned>(suffix));
+        if (!SDFs.exists(path)) {
+            available = true;
+            break;
+        }
+    }
+    if (!available) {
+        return false;
+    }
+
+#if defined(ARCH_PORTDUINO) || defined(HAS_SD_MMC)
+    File file = SDFs.open(path, FILE_WRITE);
+#else
+    FsFile file = SDFs.open(path, O_RDWR | O_CREAT);
+#endif
+    if (!file) {
+        return false;
+    }
+
+    file.println("FriendMeshOS diagnostic export v1");
+    file.println("plaintext=true");
+    file.println("restorable=false");
+    file.println("coordinates=REDACTED");
+    file.println("node_ids=REDACTED");
+    file.println("message_bodies=EXCLUDED");
+    file.println("keys=EXCLUDED");
+    file.print("exported_events=");
+    file.println(static_cast<unsigned long>(friendMeshDiagnostics.size()));
+    file.print("retained_capacity=");
+    file.println(static_cast<unsigned long>(friendMeshDiagnostics.capacity()));
+    file.print("generated_at=");
+    file.println(static_cast<unsigned long>(VALID_TIME(actTime) ? actTime : 0));
+    file.println();
+
+    char eventBuffer[768];
+    for (size_t index = 0; index < friendMeshDiagnostics.size(); index++) {
+        const auto *event = friendMeshDiagnostics.at(index);
+        if (!event || !friendmesh::observability::formatDiagnosticEvent(*event, eventBuffer, sizeof(eventBuffer))) {
+            file.close();
+            return false;
+        }
+        file.println(eventBuffer);
+    }
+    file.close();
+    return true;
+#else
+    (void)path;
+    (void)pathSize;
+    return false;
+#endif
+}
+
+void TFTView_320x240::refreshFriendMeshDiagnostics(void)
+{
+    using friendmesh::observability::DiagnosticEventType;
+    using friendmesh::platform::TDeckCapabilityInputs;
+    using friendmesh::platform::TDeckCapabilityService;
+
+    const bool gpsDetected = db.config.has_position &&
+                             db.config.position.gps_mode != meshtastic_Config_PositionConfig_GpsMode_NOT_PRESENT;
+#if defined(HAS_SDCARD)
+    constexpr bool sdSupported = true;
+#else
+    constexpr bool sdSupported = false;
+#endif
+    const bool touchReady = displaydriver->hasTouch();
+    const bool trackballReady = inputdriver->hasEncoderDevice();
+    const bool keyboardReady = inputdriver->hasKeyboardDevice();
+
+    TDeckCapabilityInputs inputs;
+    inputs.gps = {true, gpsDetected, gpsDetected && hasPosition};
+    inputs.magnetometer = {false, false, false};
+    inputs.sd = {sdSupported, cardDetected, cardDetected};
+    inputs.maps = {sdSupported, cardDetected, false};
+    inputs.touch = {true, touchReady, touchReady};
+    inputs.trackball = {true, trackballReady, trackballReady};
+    inputs.keyboard = {true, keyboardReady, keyboardReady};
+    inputs.lora = {true, db.config.has_lora, db.config.has_lora};
+    const auto capabilities = TDeckCapabilityService::snapshot(inputs);
+
+    size_t used = 0;
+    auto append = [this, &used](const char *format, auto... values) {
+        if (used >= sizeof(friendMeshDiagnosticsBuffer)) {
+            return;
+        }
+        const int written = std::snprintf(friendMeshDiagnosticsBuffer + used,
+                                          sizeof(friendMeshDiagnosticsBuffer) - used, format, values...);
+        if (written > 0) {
+            used += std::min(static_cast<size_t>(written), sizeof(friendMeshDiagnosticsBuffer) - used);
+        }
+    };
+
+    append("CAPABILITIES\nGPS %-9s MAG %-9s\n", capabilityStateName(capabilities.gps),
+           capabilityStateName(capabilities.magnetometer));
+    append("SD  %-9s MAP %-9s\n", capabilityStateName(capabilities.sd), capabilityStateName(capabilities.maps));
+    append("TOUCH %-6s TRACK %-6s\n", capabilityStateName(capabilities.touch), capabilityStateName(capabilities.trackball));
+    const size_t visibleCount = visibleFriendMeshDiagnosticCount();
+    append("KEY %-8s LORA %-8s\n\np=port ch=channel h=hops\nPKI=direct  ACK/NAK=result\nVIEW %u  STORED %u/%u\n",
+           capabilityStateName(capabilities.keyboard), capabilityStateName(capabilities.lora),
+           static_cast<unsigned>(visibleCount), static_cast<unsigned>(friendMeshDiagnostics.size()),
+           static_cast<unsigned>(friendMeshDiagnostics.capacity()));
+
+    const size_t visible = std::min<size_t>(8, visibleCount);
+    for (size_t offset = 0; offset < visible; offset++) {
+        const auto *event = visibleFriendMeshDiagnosticEvent(visibleCount - 1 - offset);
+        if (event->type == DiagnosticEventType::PACKET) {
+            if (event->packet.routing == friendmesh::observability::RoutingResult::NAK) {
+                append("#%lu PKT p%u ch%u %s h%d%s NAK:%s\n", static_cast<unsigned long>(event->sequence),
+                       static_cast<unsigned>(event->packet.port), static_cast<unsigned>(event->packet.channel),
+                       ::destinationName(event->packet.destination), event->packet.observedHops,
+                       event->packet.pkiEncrypted ? " PKI" : "",
+                       friendmesh::observability::routingErrorName(event->packet.routingError));
+            } else {
+                append("#%lu PKT p%u ch%u %s h%d%s%s\n", static_cast<unsigned long>(event->sequence),
+                       static_cast<unsigned>(event->packet.port), static_cast<unsigned>(event->packet.channel),
+                       ::destinationName(event->packet.destination), event->packet.observedHops,
+                       event->packet.pkiEncrypted ? " PKI" : "",
+                       event->packet.routing == friendmesh::observability::RoutingResult::ACK      ? " ACK"
+                       : event->packet.routing == friendmesh::observability::RoutingResult::MALFORMED ? " BAD"
+                                                                                                     : "");
+            }
+        } else if (event->type == DiagnosticEventType::QUEUE) {
+            append("#%lu QUEUE %u/%u %s\n", static_cast<unsigned long>(event->sequence),
+                   static_cast<unsigned>(event->queue.free), static_cast<unsigned>(event->queue.capacity),
+                   ::queueStateName(event->queue.state));
+        } else {
+            append("#%lu POS %s/%s %s\n", static_cast<unsigned long>(event->sequence),
+                   ::freshnessName(event->position.position), ::freshnessName(event->position.lastHeard),
+                   friendmesh::observability::positionSourceName(event->position.source));
+        }
+    }
+    lv_label_set_text(friendMeshDiagnosticsLabel, friendMeshDiagnosticsBuffer);
+    lv_obj_set_state(friendMeshDiagnosticsDetailButton, LV_STATE_DISABLED, visibleCount == 0);
+}
+#endif
+
 void TFTView_320x240::updateTheme(void)
 {
     Themes::initStyles();
@@ -1031,6 +1363,16 @@ void TFTView_320x240::ui_events_init(void)
     lv_obj_add_event_cb(objects.tools_neighbors_button, ui_event_node_details, LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(objects.tools_statistics_button, ui_event_statistics, LV_EVENT_ALL, 0);
     lv_obj_add_event_cb(objects.tools_packet_log_button, ui_event_packet_log, LV_EVENT_ALL, 0);
+#if defined(FRIENDMESHOS_TDECK)
+    lv_obj_add_event_cb(friendMeshDiagnosticsButton, ui_event_friendmesh_diagnostics, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshDiagnosticsDetailButton, ui_event_friendmesh_diagnostics_detail, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshDiagnosticsBackButton, ui_event_friendmesh_diagnostics_back, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshDiagnosticDetailBackButton, ui_event_friendmesh_diagnostics_detail_back, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshDiagnosticOlderButton, ui_event_friendmesh_diagnostics_older, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshDiagnosticNewerButton, ui_event_friendmesh_diagnostics_newer, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshDiagnosticClearButton, ui_event_friendmesh_diagnostics_clear_view, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshDiagnosticExportButton, ui_event_friendmesh_diagnostics_export, LV_EVENT_CLICKED, 0);
+#endif
     // tools
     lv_obj_add_event_cb(objects.detector_start_button, ui_event_mesh_detector_start, LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(objects.signal_scanner_node_button, ui_event_signal_scanner_node, LV_EVENT_CLICKED, 0);
@@ -2153,11 +2495,15 @@ void TFTView_320x240::ui_event_reboot_button(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
     if (event_code == LV_EVENT_CLICKED && THIS->activeSettings == eNone) {
-        lv_obj_remove_flag(objects.boot_logo_button, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(objects.boot_logo, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(objects.boot_logo_button, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(objects.meshtastic_url, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(objects.firmware_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(objects.bluetooth_button, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(objects.boot_logo_arc, LV_OBJ_FLAG_HIDDEN);
         lv_screen_load_anim(objects.boot_screen, LV_SCR_LOAD_ANIM_FADE_IN, 1000, 0, false);
         lv_obj_clear_flag(objects.reboot_panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(objects.reboot_panel);
         lv_group_focus_obj(objects.cancel_reboot_button);
         THIS->disablePanel(objects.controller_panel);
         THIS->disablePanel(objects.tab_page_basic_settings);
@@ -2206,6 +2552,7 @@ void TFTView_320x240::ui_event_device_progmode_button(lv_event_t *e)
             ignoreClicked = true;
             // open dialog
             lv_obj_remove_flag(objects.settings_reboot_panel, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_move_foreground(objects.settings_reboot_panel);
             lv_group_focus_obj(objects.settings_reboot_panel);
             THIS->activeSettings = eDisplayMode;
 #endif
@@ -2670,17 +3017,25 @@ void TFTView_320x240::loadMap(void)
 #elif defined(HAS_SD_MMC)
         auto tileService = new SDCardService();
         map = new MapPanel(objects.raw_map_panel, tileService);
+#if !defined(FRIENDMESHOS_TDECK) || defined(FRIENDMESHOS_ENABLE_ONLINE_MAP_TILES)
         map->setBackupService(
             new URLService([tileService](const char *name, void *img, size_t len) { return tileService->save(name, img, len); }));
+#endif
 #elif defined(HAS_SDCARD)
         auto tileService = new SdFatService();
         map = new MapPanel(objects.raw_map_panel, tileService);
+#if !defined(FRIENDMESHOS_TDECK) || defined(FRIENDMESHOS_ENABLE_ONLINE_MAP_TILES)
         map->setBackupService(
             new URLService([tileService](const char *name, void *img, size_t len) { return tileService->save(name, img, len); }));
+#endif
 #elif defined(ARCH_PORTDUINO)
         map = new MapPanel(objects.raw_map_panel, new SDCardService()); // TODO: LinuxFileSystemService
 #else
+#if defined(FRIENDMESHOS_TDECK) && !defined(FRIENDMESHOS_ENABLE_ONLINE_MAP_TILES)
+        map = new MapPanel(objects.raw_map_panel);
+#else
         map = new MapPanel(objects.raw_map_panel, new URLService());
+#endif
 #endif
         map->setHomeLocationImage(objects.home_location_image);
         lv_obj_add_flag(objects.home_location_image, LV_OBJ_FLAG_CLICKABLE);
@@ -3140,6 +3495,114 @@ void TFTView_320x240::ui_event_packet_log(lv_event_t *e)
         lv_obj_clean(objects.tools_packet_log_panel);
     }
 }
+
+#if defined(FRIENDMESHOS_TDECK)
+void TFTView_320x240::ui_event_friendmesh_diagnostics(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        THIS->resetFriendMeshExportConfirmation();
+        THIS->refreshFriendMeshDiagnostics();
+        THIS->ui_set_active(objects.settings_button, THIS->friendMeshDiagnosticsPanel,
+                            THIS->friendMeshDiagnosticsTopPanel);
+    }
+}
+
+void TFTView_320x240::ui_event_friendmesh_diagnostics_back(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        THIS->resetFriendMeshExportConfirmation();
+        THIS->ui_set_active(objects.settings_button, objects.controller_panel, objects.top_settings_panel);
+    }
+}
+
+void TFTView_320x240::ui_event_friendmesh_diagnostics_detail(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        THIS->resetFriendMeshExportConfirmation();
+        THIS->friendMeshDiagnosticFollowLatest = true;
+        THIS->refreshFriendMeshDiagnosticDetail();
+        THIS->ui_set_active(objects.settings_button, THIS->friendMeshDiagnosticDetailPanel,
+                            THIS->friendMeshDiagnosticDetailTopPanel);
+    }
+}
+
+void TFTView_320x240::ui_event_friendmesh_diagnostics_detail_back(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        THIS->resetFriendMeshExportConfirmation();
+        THIS->refreshFriendMeshDiagnostics();
+        THIS->ui_set_active(objects.settings_button, THIS->friendMeshDiagnosticsPanel,
+                            THIS->friendMeshDiagnosticsTopPanel);
+    }
+}
+
+void TFTView_320x240::ui_event_friendmesh_diagnostics_older(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED && THIS->friendMeshDiagnosticSelection > 0) {
+        THIS->resetFriendMeshExportConfirmation();
+        THIS->friendMeshDiagnosticFollowLatest = false;
+        THIS->friendMeshDiagnosticSelection--;
+        THIS->refreshFriendMeshDiagnosticDetail();
+    }
+}
+
+void TFTView_320x240::ui_event_friendmesh_diagnostics_newer(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    THIS->resetFriendMeshExportConfirmation();
+    const size_t count = THIS->visibleFriendMeshDiagnosticCount();
+    if (THIS->friendMeshDiagnosticSelection + 1 < count) {
+        THIS->friendMeshDiagnosticSelection++;
+    }
+    THIS->friendMeshDiagnosticFollowLatest = THIS->friendMeshDiagnosticSelection + 1 >= count;
+    THIS->refreshFriendMeshDiagnosticDetail();
+}
+
+void TFTView_320x240::ui_event_friendmesh_diagnostics_clear_view(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    THIS->resetFriendMeshExportConfirmation();
+    if (THIS->friendMeshDiagnostics.size() > 0) {
+        const auto *latest = THIS->friendMeshDiagnostics.at(THIS->friendMeshDiagnostics.size() - 1);
+        THIS->friendMeshDiagnosticMinimumSequence = latest ? latest->sequence + 1 : 0;
+    }
+    THIS->friendMeshDiagnosticSelection = 0;
+    THIS->friendMeshDiagnosticFollowLatest = true;
+    THIS->refreshFriendMeshDiagnosticDetail();
+}
+
+void TFTView_320x240::ui_event_friendmesh_diagnostics_export(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+    if (!THIS->friendMeshDiagnosticExportConfirm) {
+        THIS->friendMeshDiagnosticExportConfirm = true;
+        lv_label_set_text(THIS->friendMeshDiagnosticExportButtonLabel, "Confirm plaintext export");
+        lv_label_set_text(THIS->friendMeshDiagnosticDetailLabel,
+                          "Export all retained events?\n\nDestination: /friendmesh/ on SD\n"
+                          "Scope: all stored events, including Clear view records\nFormat: plaintext, not restorable\n"
+                          "Redacted: coordinates, node IDs, message bodies, keys\n\n"
+                          "Press Confirm plaintext export to write.");
+        return;
+    }
+
+    char path[64];
+    if (THIS->exportFriendMeshDiagnostics(path, sizeof(path))) {
+        static char result[96];
+        std::snprintf(result, sizeof(result), "Exported redacted diagnostics:\n%s", path);
+        THIS->messageAlert(result, true);
+    } else {
+        THIS->messageAlert("Diagnostic export failed. Check SD and stored events.", true);
+    }
+    THIS->resetFriendMeshExportConfirmation();
+    THIS->refreshFriendMeshDiagnosticDetail();
+}
+#endif
 
 void TFTView_320x240::packetDetected(const meshtastic_MeshPacket &p)
 {
@@ -5893,9 +6356,49 @@ void TFTView_320x240::handleTextMessageResponse(uint32_t channelOrNode, const ui
     }
 }
 
+#if defined(FRIENDMESHOS_TDECK)
+void TFTView_320x240::recordFriendMeshPositionFreshness(bool force)
+{
+    const uint32_t now = VALID_TIME(actTime) ? static_cast<uint32_t>(actTime) : 0;
+    const auto observation = friendmesh::observability::inspectPosition(
+        friendMeshHasObservedPosition, friendMeshLastPositionTimestamp, friendMeshLastHeardTimestamp, now,
+        friendmesh::observability::POSITION_STALE_SECONDS, friendMeshPositionSource);
+
+    const bool changed = !friendMeshHasPositionSnapshot ||
+                         observation.position != friendMeshLastPositionObservation.position ||
+                         observation.lastHeard != friendMeshLastPositionObservation.lastHeard ||
+                         observation.positionAge.clockSkew != friendMeshLastPositionObservation.positionAge.clockSkew ||
+                         observation.lastHeardAge.clockSkew != friendMeshLastPositionObservation.lastHeardAge.clockSkew ||
+                         observation.source != friendMeshLastPositionObservation.source;
+    if (force || changed) {
+        friendMeshDiagnostics.recordPosition(observation, now);
+        friendMeshLastPositionObservation = observation;
+        friendMeshHasPositionSnapshot = true;
+    }
+}
+#endif
+
 void TFTView_320x240::packetReceived(const meshtastic_MeshPacket &p)
 {
     MeshtasticView::packetReceived(p);
+
+#if defined(FRIENDMESHOS_TDECK)
+    const uint32_t observedAt = VALID_TIME(actTime) ? actTime : p.rx_time;
+    friendMeshDiagnostics.recordPacket(friendmesh::observability::inspectPacket(p, observedAt), observedAt);
+    if (p.from != ownNode && observedAt != 0) {
+        friendMeshLastHeardTimestamp = observedAt;
+    }
+    if (p.which_payload_variant == meshtastic_MeshPacket_decoded_tag &&
+        p.decoded.portnum == meshtastic_PortNum_POSITION_APP) {
+        meshtastic_Position position = meshtastic_Position_init_default;
+        if (pb_decode_from_bytes(p.decoded.payload.bytes, p.decoded.payload.size, &meshtastic_Position_msg, &position)) {
+            friendMeshHasObservedPosition = position.latitude_i != 0 && position.longitude_i != 0;
+            friendMeshLastPositionTimestamp = position.time != 0 ? position.time : observedAt;
+            friendMeshPositionSource = position.location_source;
+            recordFriendMeshPositionFreshness(true);
+        }
+    }
+#endif
 
     // try update time from packet
     if (!VALID_TIME(actTime) && VALID_TIME(p.rx_time))
@@ -5911,6 +6414,16 @@ void TFTView_320x240::packetReceived(const meshtastic_MeshPacket &p)
         updateSignalStrength(p.rx_rssi, p.rx_snr);
     }
     updateStatistics(p);
+}
+
+void TFTView_320x240::updateQueueStatus(const meshtastic_QueueStatus &status)
+{
+#if defined(FRIENDMESHOS_TDECK)
+    friendMeshDiagnostics.recordQueue(friendmesh::observability::inspectQueue(status),
+                                      VALID_TIME(actTime) ? actTime : 0);
+#else
+    (void)status;
+#endif
 }
 
 void TFTView_320x240::notifyConnected(const char *info)
@@ -7507,6 +8020,25 @@ void TFTView_320x240::task_handler(void)
     if (screensInitialised) {
         if (map && activePanel == objects.map_panel)
             map->task_handler();
+
+#if defined(FRIENDMESHOS_TDECK)
+        const uint32_t nowMs = millis();
+        if (friendMeshPositionProbeMs == 0 ||
+            !Throttle::isWithinTimespanMs(friendMeshPositionProbeMs, 60U * 1000U)) {
+            friendMeshPositionProbeMs = nowMs;
+            recordFriendMeshPositionFreshness(false);
+        }
+        if ((activePanel == friendMeshDiagnosticsPanel || activePanel == friendMeshDiagnosticDetailPanel) &&
+            (friendMeshDiagnosticRefreshMs == 0 ||
+             !Throttle::isWithinTimespanMs(friendMeshDiagnosticRefreshMs, 1000U))) {
+            friendMeshDiagnosticRefreshMs = nowMs;
+            if (activePanel == friendMeshDiagnosticsPanel) {
+                refreshFriendMeshDiagnostics();
+            } else {
+                refreshFriendMeshDiagnosticDetail();
+            }
+        }
+#endif
 
         if (curtime - lastrun1 >= 1) { // call every 1s
             if (map) {

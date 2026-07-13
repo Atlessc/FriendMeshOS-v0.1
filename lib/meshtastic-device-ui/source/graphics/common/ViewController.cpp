@@ -886,6 +886,7 @@ bool ViewController::handleFromRadio(const meshtastic_FromRadio &from)
             }
             case meshtastic_FromRadio_queueStatus_tag: {
                 const meshtastic_QueueStatus &q = from.queueStatus;
+                view->updateQueueStatus(q);
                 if (q.free == 0) {
                     ILOG_CRIT("meshqueue full!?");
                 }
