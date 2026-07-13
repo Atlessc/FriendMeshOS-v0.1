@@ -58,6 +58,8 @@ using SignatureVerifyFn = bool (*)(const uint8_t publicKey[32], const uint8_t *m
 
 bool encodeCanonicalSignedFields(const friendmesh_FriendMeshSignedFields &fields, uint8_t *output, size_t outputCapacity,
                                  size_t &outputSize);
+int32_t eventTypeValue(const friendmesh_FriendMeshSignedFields &fields);
+bool isKnownEventType(const friendmesh_FriendMeshSignedFields &fields);
 bool encodeFrame(const friendmesh_FriendMeshEnvelope &envelope, uint8_t *output, size_t outputCapacity,
                  size_t &outputSize);
 DecodeResult decodeFrame(const uint8_t *frame, size_t frameSize, friendmesh_FriendMeshEnvelope &envelope);

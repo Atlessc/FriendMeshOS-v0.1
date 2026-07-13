@@ -13,6 +13,7 @@
 #include "graphics/map/URLService.h"
 #include "graphics/view/TFT/Themes.h"
 #if defined(FRIENDMESHOS_TDECK)
+#include "friendmesh/FriendMeshStatus.h"
 #include "friendmesh/observability/DiagnosticFormatter.h"
 #include "graphics/view/TFT/FriendMeshBranding.h"
 #include "mesh/Throttle.h"
@@ -1100,6 +1101,9 @@ void TFTView_320x240::refreshFriendMeshDiagnostics(void)
            capabilityStateName(capabilities.keyboard), capabilityStateName(capabilities.lora),
            static_cast<unsigned>(visibleCount), static_cast<unsigned>(friendMeshDiagnostics.size()),
            static_cast<unsigned>(friendMeshDiagnostics.capacity()));
+    const auto identityStatus = friendMeshSigningIdentityStatus();
+    append("IDENTITY %s\nTX %s\n\n", friendmesh::security::signingIdentityStatusName(identityStatus),
+           identityStatus == friendmesh::security::SigningIdentityStatus::READY ? "READY" : "DISABLED");
 
     const size_t visible = std::min<size_t>(8, visibleCount);
     for (size_t offset = 0; offset < visible; offset++) {

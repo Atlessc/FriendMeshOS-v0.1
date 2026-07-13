@@ -96,6 +96,21 @@ bool FriendMeshCrypto::verify(const uint8_t publicKey[ED25519_PUBLIC_KEY_SIZE], 
 #endif
 }
 
+void FriendMeshCrypto::secureWipe(void *value, size_t size)
+{
+    if (!value) {
+        return;
+    }
+#if defined(ARCH_ESP32)
+    sodium_memzero(value, size);
+#else
+    volatile uint8_t *bytes = static_cast<volatile uint8_t *>(value);
+    while (size-- > 0) {
+        *bytes++ = 0;
+    }
+#endif
+}
+
 bool FriendMeshCrypto::selfTest()
 {
 #if defined(ARCH_ESP32)

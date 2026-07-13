@@ -19,6 +19,7 @@ done
 c++ -std=c++17 -Wall -Wextra -Werror -I"$ROOT_DIR/src" -I"$ROOT_DIR/src/mesh/generated" -I"$NANOPB_DIR" \
     "$ROOT_DIR/bin/friendmesh-protocol-check.cpp" \
     "$ROOT_DIR/src/friendmesh/generated/friendmesh.pb.cpp" \
+    "$ROOT_DIR/src/friendmesh/protocol/FriendMeshEnvelopeBuilder.cpp" \
     "$ROOT_DIR/src/friendmesh/protocol/FriendMeshProtocol.cpp" \
     "$ROOT_DIR/src/friendmesh/protocol/FriendMeshReplayWindow.cpp" \
     "$TMP_DIR"/*.o -o "$TMP_DIR/friendmesh-protocol-check"

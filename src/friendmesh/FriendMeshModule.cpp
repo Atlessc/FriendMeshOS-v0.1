@@ -1,4 +1,5 @@
 #include "FriendMeshModule.h"
+#include "FriendMeshStatus.h"
 
 #if defined(FRIENDMESHOS_TDECK)
 
@@ -11,6 +12,12 @@
 
 FriendMeshModule *friendMeshModule;
 
+friendmesh::security::SigningIdentityStatus friendMeshSigningIdentityStatus()
+{
+    return friendMeshModule ? friendMeshModule->signingIdentityStatus()
+                            : friendmesh::security::SigningIdentityStatus::STORAGE_UNAVAILABLE;
+}
+
 FriendMeshModule::FriendMeshModule() : SinglePortModule("FriendMesh", meshtastic_PortNum_PRIVATE_APP)
 {
     cryptoReady = friendmesh::security::FriendMeshCrypto::selfTest();
@@ -19,6 +26,9 @@ FriendMeshModule::FriendMeshModule() : SinglePortModule("FriendMesh", meshtastic
     } else {
         LOG_INFO("FriendMesh Ed25519 self-test passed; signed envelope receiver ready");
     }
+    const auto identityStatus = signingIdentity.initialize(nullptr);
+    LOG_INFO("FriendMesh outbound signing identity: %s; transmit disabled until protected storage is available",
+             friendmesh::security::signingIdentityStatusName(identityStatus));
 }
 
 ProcessMessage FriendMeshModule::handleReceived(const meshtastic_MeshPacket &packet)
@@ -33,9 +43,13 @@ ProcessMessage FriendMeshModule::handleReceived(const meshtastic_MeshPacket &pac
         return ProcessMessage::STOP;
     }
 
+    if (!friendmesh::protocol::isKnownEventType(envelope.signed_fields)) {
+        LOG_WARN("Rejected FriendMesh frame before payload dispatch: unknown event type");
+        return ProcessMessage::STOP;
+    }
     friendmesh_FriendMeshIdentityBinding binding = friendmesh_FriendMeshIdentityBinding_init_zero;
-    const bool identityBinding = envelope.signed_fields.event_type ==
-                                 friendmesh_FriendMeshEventType_FRIENDMESH_EVENT_IDENTITY_BINDING;
+    const int32_t eventType = friendmesh::protocol::eventTypeValue(envelope.signed_fields);
+    const bool identityBinding = eventType == friendmesh_FriendMeshEventType_FRIENDMESH_EVENT_IDENTITY_BINDING;
     if (identityBinding) {
         if (!friendmesh::security::decodeIdentityBinding(envelope.signed_fields.payload.bytes,
                                                         envelope.signed_fields.payload.size, binding)) {
@@ -76,7 +90,7 @@ ProcessMessage FriendMeshModule::handleReceived(const meshtastic_MeshPacket &pac
                  packet.from);
     } else {
         LOG_INFO("Accepted untrusted FriendMesh protocol event type=%u sequence=%llu",
-                 static_cast<unsigned>(envelope.signed_fields.event_type),
+                 static_cast<unsigned>(eventType),
                  static_cast<unsigned long long>(envelope.signed_fields.sender_sequence));
     }
     return ProcessMessage::STOP;

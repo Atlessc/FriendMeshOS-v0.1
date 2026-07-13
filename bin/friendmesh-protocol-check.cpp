@@ -1,4 +1,5 @@
 #include "friendmesh/protocol/FriendMeshProtocol.h"
+#include "friendmesh/protocol/FriendMeshEnvelopeBuilder.h"
 
 #include "pb_decode.h"
 #include "pb_encode.h"
@@ -56,6 +57,20 @@ bool fakeVerify(const uint8_t[32], const uint8_t *message, size_t size, const ui
         }
     }
     return true;
+}
+
+bool fakeCreate(const uint8_t[32], const uint8_t *message, size_t size, uint8_t signature[64], void *)
+{
+    signature[0] = checksum(message, size);
+    for (size_t index = 1; index < 64; index++) {
+        signature[index] = static_cast<uint8_t>(index);
+    }
+    return true;
+}
+
+bool failCreate(const uint8_t[32], const uint8_t *, size_t, uint8_t[64], void *)
+{
+    return false;
 }
 
 void fakeSign(friendmesh_FriendMeshEnvelope &envelope)
@@ -222,6 +237,79 @@ void testReplayWindow()
             "replay sender capacity fails closed");
 }
 
+void testOutboundBuilder()
+{
+    uint8_t groupId[16];
+    uint8_t eventId[16];
+    uint8_t publicKey[32];
+    for (size_t index = 0; index < sizeof(groupId); index++) {
+        groupId[index] = static_cast<uint8_t>(0x30 + index);
+        eventId[index] = static_cast<uint8_t>(0x50 + index);
+    }
+    for (size_t index = 0; index < sizeof(publicKey); index++) {
+        publicKey[index] = static_cast<uint8_t>(0x70 + index);
+    }
+
+    friendmesh::protocol::EnvelopeBuildRequest request;
+    request.groupId = groupId;
+    request.groupEpoch = 9;
+    request.senderNode = 0x10203040;
+    request.senderSequence = 12;
+    request.eventId = eventId;
+    request.createdAt = 1783896000;
+    request.eventType = friendmesh_FriendMeshEventType_FRIENDMESH_EVENT_PROTOCOL_PROBE;
+
+    friendmesh_FriendMeshEnvelope envelope = friendmesh_FriendMeshEnvelope_init_zero;
+    uint8_t frame[friendmesh::protocol::FRIENDMESH_MAX_FRAME_SIZE];
+    size_t frameSize = 0;
+    require(friendmesh::protocol::buildSignedFrame(request, publicKey, fakeCreate, nullptr, envelope, frame,
+                                                    sizeof(frame), frameSize) ==
+                friendmesh::protocol::EnvelopeBuildResult::BUILT,
+            "outbound frame built");
+
+    friendmesh_FriendMeshEnvelope decoded = friendmesh_FriendMeshEnvelope_init_zero;
+    require(friendmesh::protocol::decodeFrame(frame, frameSize, decoded) == DecodeResult::OK,
+            "outbound frame canonical decode");
+    auto context = matchingContext(decoded);
+    require(validateFresh(decoded, context) == ValidationResult::ACCEPTED, "outbound frame validates");
+
+    uint8_t oversized[49]{};
+    request.payload = oversized;
+    request.payloadSize = sizeof(oversized);
+    require(friendmesh::protocol::buildSignedFrame(request, publicKey, fakeCreate, nullptr, envelope, frame,
+                                                    sizeof(frame), frameSize) ==
+                friendmesh::protocol::EnvelopeBuildResult::PAYLOAD_TOO_LARGE,
+            "outbound payload bound enforced");
+    request.payload = nullptr;
+    request.payloadSize = 0;
+    require(friendmesh::protocol::buildSignedFrame(request, publicKey, failCreate, nullptr, envelope, frame,
+                                                    sizeof(frame), frameSize) ==
+                friendmesh::protocol::EnvelopeBuildResult::SIGNING_FAILED,
+            "outbound signing failure propagated");
+    require(friendmesh::protocol::buildSignedFrame(request, publicKey, fakeCreate, nullptr, envelope, frame, 8,
+                                                    frameSize) ==
+                friendmesh::protocol::EnvelopeBuildResult::FRAME_ENCODING_FAILED,
+            "outbound frame capacity enforced");
+
+    eventId[0] = 0;
+    std::memset(eventId + 1, 0, sizeof(eventId) - 1);
+    require(friendmesh::protocol::buildSignedFrame(request, publicKey, fakeCreate, nullptr, envelope, frame,
+                                                    sizeof(frame), frameSize) ==
+                friendmesh::protocol::EnvelopeBuildResult::INVALID_ARGUMENT,
+            "outbound zero event id rejected");
+
+    auto zeroGroup = makeEnvelope();
+    std::memset(zeroGroup.signed_fields.group_id, 0, sizeof(zeroGroup.signed_fields.group_id));
+    fakeSign(zeroGroup);
+    require(validateFresh(zeroGroup, matchingContext(zeroGroup)) == ValidationResult::MALFORMED,
+            "zero group id rejected");
+    auto zeroEpoch = makeEnvelope();
+    zeroEpoch.signed_fields.group_epoch = 0;
+    fakeSign(zeroEpoch);
+    require(validateFresh(zeroEpoch, matchingContext(zeroEpoch)) == ValidationResult::MALFORMED,
+            "zero group epoch rejected");
+}
+
 } // namespace
 
 int main()
@@ -229,6 +317,7 @@ int main()
     testFrameBoundaries();
     testValidationFailures();
     testReplayWindow();
+    testOutboundBuilder();
     if (failures == 0) {
         std::puts("FriendMesh protocol validation checks passed");
     }

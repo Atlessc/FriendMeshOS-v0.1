@@ -861,6 +861,19 @@ Use this session handoff template beneath the milestone log:
 
 ## Milestone log
 
+### 2026-07-12 — Phase 2 outbound builder, protected-identity boundary, and decoder fuzzing
+
+- Status: IMPLEMENTED, HOST-VERIFIED, BUILT, AND PHYSICALLY REGRESSION-TESTED; PROTECTED STORAGE AND TWO-FRIENDMESH EXCHANGE REMAIN
+- Branch / HEAD: `develop` / `0d45a16` plus uncommitted working-tree changes
+- Roadmap item(s): bounded signed outbound construction, fail-closed identity storage/lifecycle states, diagnostic identity status, and malformed-frame fuzzing
+- Files changed: FriendMesh protocol builder, signing identity lifecycle, crypto wipe helper, module/status API, T-Deck diagnostics, host check/fuzz scripts, and Phase 2 documentation/trackers
+- Commands run: `bin/check-friendmesh-protocol.sh`; `bin/check-friendmesh-fuzz.sh`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
+- Build/test result: outbound success/failure vectors, RFC 8032 Ed25519 checks, ten Meshtastic v2.7.26 compatibility vectors, and the 150,000-case deterministic decoder corpus pass; the corpus found an unknown-enum C++ undefined-behavior edge, fixed by raw-value validation before dispatch; final incremental `t-deck-tft` build passed in 85.07 seconds at RAM 38.3% (125344/327680) and app flash 55.5% (3637865/6553600); application SHA-256 is `21fe2faa58dddba1c50ef38e62cd3559ce182ab3b3d36aa7ef0310b916e5db3f`
+- Hardware result: operator normal-uploaded successfully; D-01 showed the expected identity and TX fields; ordinary messaging, private one-to-one messaging, BLE configuration loading, and all previously tested device features continued to work. The exact Ed25519 boot-log capture remains separate evidence.
+- Decisions made: no FriendMesh signing seed may be generated into a plaintext or unauthenticated store; production TX stays disabled at `STORAGE_UNAVAILABLE` until Phase 3 supplies authenticated encrypted persistence; diagnostics expose the state honestly; outbound construction remains separate from radio enqueue
+- Known issues: protected persistence, identity verification screens, physical boot status, actual radio transmission, two-FriendMesh exchange, and durable replay remain open
+- Next action: begin the authenticated storage backend design while retaining the physically verified `IDENTITY STORAGE_UNAVAILABLE` / `TX DISABLED` fail-closed state until that backend passes its security gates
+
 ### 2026-07-12 — Phase 2 signed-envelope receiver foundation
 
 - Status: IMPLEMENTED AND HOST-VERIFIED; PHASE 2 REMAINS OPEN FOR PERSISTENCE, UI, FUZZING, TRANSMIT, AND PHYSICAL TESTS
@@ -869,10 +882,10 @@ Use this session handoff template beneath the milestone log:
 - Files changed: `protobufs/friendmesh/`, `src/friendmesh/`, `src/modules/Modules.cpp`, Phase 2 check/generation scripts, protocol contract, decision/risk/delta trackers, game plan, and roadmap
 - Commands run: `bin/regen-friendmesh-protos.sh`; `bin/check-friendmesh-protocol.sh`; `bin/check-friendmesh-ed25519.sh`; `bin/check-friendmesh-vectors.sh`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
 - Build/test result: a final clean `t-deck-tft` rebuild passed in 176.48 seconds at RAM 38.2% (125328/327680) and app flash 55.5% (3637209/6553600); application SHA-256 is `d54577b4f5d54a4dd4218dd0dec259876df9624d42bbc484ed058228854e789c`; strict protocol/replay checks, RFC 8032 Ed25519 positive/mutation/`S + L` malleability vectors, and ten Meshtastic v2.7.26 compatibility vectors pass
-- Hardware result: not run; no device was connected, flashed, reset, rebooted, or otherwise mutated
+- Hardware result: operator normal-uploaded the application build and reported the existing T-Deck behavior still works. This is a physical regression pass for the previously working device behavior; the exact FriendMesh Ed25519 receiver-ready boot log and two-FriendMesh-device protocol exchange remain separate open evidence.
 - Decisions made: v1 is `FMSH` plus version byte plus one bounded canonical Nanopb envelope on `PRIVATE_APP`; Ed25519 uses the ESP32 framework's libsodium and a separate seed; the signature covers the canonical inline payload; the NodeDB X25519 match is consistency evidence, not person verification; accepted identity bindings remain explicitly untrusted; valid RTC enables 24-hour-past/10-minute-future rejection
 - Known issues: signing seed and replay persistence await Phase 3; the receiver has no transmit/UI/group-encryption path; volatile replay cannot authorize state changes; fuzzing, physical crypto self-test, two-FriendMesh exchange, opaque stock relay, and stock regression remain open; the eight-group carrier still lacks inner AEAD and cannot be called private
-- Next action: normal-upload without `uploadfs` and verify the FriendMesh Ed25519 self-test log plus ordinary Meshtastic regression before implementing protected identity persistence/UI
+- Next action: capture the FriendMesh Ed25519 self-test boot log, then implement protected signing-identity persistence and the identity setup/verification UI without weakening the Phase 3 storage boundary
 
 ### 2026-07-12 — Phase 2 authorized with explicit Phase 1 deferrals
 

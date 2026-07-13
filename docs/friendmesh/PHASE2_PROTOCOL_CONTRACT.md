@@ -20,8 +20,13 @@ This slice establishes:
 - bounded in-memory replay protection;
 - strict rejection of unknown versions, unknown event types, malformed protobufs, and noncanonical encodings;
 - a T-Deck-only `PRIVATE_APP` receiver that does not consume unrelated private application traffic.
+- a bounded outbound builder that returns explicit argument, payload, signing, canonical-encoding, and frame-capacity failures;
+- a signing-identity lifecycle/store interface that refuses plaintext or encrypted-but-unauthenticated storage;
+- visible diagnostics showing signing identity status and whether FriendMesh transmit is enabled.
 
 It does **not** yet establish a private group. There is no group-key encryption, membership database, identity-key persistence, invitation UI, verification UI, transmit pipeline, or durable replay state in this slice. An accepted identity-binding frame is logged as untrusted until a later in-person verification flow commits it.
+
+The outbound builder is deliberately not the radio transmit pipeline. It can produce a canonical signed frame only when a caller supplies a ready signing identity. The production module currently initializes without a protected store, reports `STORAGE_UNAVAILABLE`, and leaves transmit `DISABLED`.
 
 ## Wire layout
 
@@ -40,8 +45,8 @@ The hard frame limit is 233 bytes. The generated maximum envelope is 224 bytes, 
 | Field | Bound / rule | Purpose |
 | --- | --- | --- |
 | `protocol_version` | exactly 1 | protects against outer/inner version confusion |
-| `group_id` | fixed 16 bytes | opaque application-group identity |
-| `group_epoch` | fixed32 | current cryptographic/authorization generation |
+| `group_id` | fixed 16 bytes, not all zero | opaque application-group identity |
+| `group_epoch` | nonzero fixed32 | current cryptographic/authorization generation |
 | `sender_node` | nonzero fixed32 | full Meshtastic node number, never a relay byte or display name |
 | `sender_sequence` | nonzero fixed64 | per-signing-identity monotonic replay coordinate |
 | `event_id` | fixed 16 bytes, not all zero | stable deduplication identity |
@@ -115,18 +120,31 @@ The replay store is RAM-only and resets on reboot. Durable, encrypted replay sta
 
 New event values require schema bounds, authorization rules, failure semantics, vectors, fuzz coverage, and a version-compatibility decision before implementation.
 
+## Signing-identity lifecycle boundary
+
+`FriendMeshSigningIdentity` recognizes `STORAGE_UNAVAILABLE`, `STORAGE_UNSAFE`, `NOT_CONFIGURED`, `LOCKED`, `READY`, `CORRUPT`, `CRYPTO_UNAVAILABLE`, `PERSIST_FAILED`, and `CREATE_NOT_ALLOWED`. A store may unlock loading or generation only when it declares authenticated encryption. A loaded record is accepted only when its nonzero generation and stored public key match the public key re-derived from its seed.
+
+New seeds are generated using libsodium CSPRNG, persisted before the state becomes `READY`, and wiped from RAM after a failed save, lock, or object destruction. Creation is accepted only from `NOT_CONFIGURED`; it cannot silently replace a ready or otherwise existing identity. Replacement requires the later explicit approval/reverification workflow. The interface intentionally has no plaintext Preferences/NVS implementation. Phase 3 must provide the reviewed PIN/storage-key/AEAD backend and transaction behavior before production identity creation is enabled.
+
+## Decoder fuzz finding
+
+The deterministic corpus covers 100,000 arbitrary byte strings up to 260 bytes and 50,000 mutations of a valid canonical seed frame. macOS runs undefined-behavior and bounds sanitizers; supported non-macOS hosts additionally run AddressSanitizer.
+
+This campaign found that Nanopb can decode an unknown numeric enum into a generated C++ enum field. Directly comparing that typed field triggered undefined behavior. FriendMesh now copies the underlying enum bytes to a signed integer, validates the raw value, and only dispatches known values. The receiver validates this before event-specific payload handling.
+
 ## Verification commands
 
 ```bash
 bin/regen-friendmesh-protos.sh
 bin/check-friendmesh-protocol.sh
+bin/check-friendmesh-fuzz.sh
 bin/check-friendmesh-ed25519.sh
 bin/check-friendmesh-vectors.sh
 $HOME/.platformio/penv/bin/pio run -e t-deck-tft
 git diff --check
 ```
 
-The protocol checker covers canonical round trips, maximum frame size, unknown outer/signed versions, unknown protobuf fields, bad signatures, wrong sender/group/epoch, stale/future time, duplicate event IDs, duplicate/stale/out-of-order sequences, and fail-closed sender-capacity exhaustion. The Ed25519 checker independently verifies an RFC 8032 known-answer vector and mutated-signature rejection using OpenSSL. The firmware performs its own libsodium self-test at boot; physical verification must confirm the success log on the T-Deck.
+The protocol checker covers canonical round trips, outbound construction/failure results, maximum frame size, unknown outer/signed versions, unknown protobuf fields, bad signatures, wrong sender/group/epoch, stale/future time, duplicate event IDs, duplicate/stale/out-of-order sequences, and fail-closed sender-capacity exhaustion. The fuzz checker runs 150,000 decoder cases with host sanitizers. The Ed25519 checker independently verifies an RFC 8032 known-answer vector and mutated/noncanonical-signature rejection using OpenSSL. The firmware performs its own libsodium self-test at boot; physical verification must confirm the success log on the T-Deck.
 
 ## Remaining Phase 2 gate
 

@@ -22,6 +22,7 @@ class FriendMeshCrypto
                      const uint8_t *message, size_t messageSize, uint8_t signature[ED25519_SIGNATURE_SIZE]);
     static bool verify(const uint8_t publicKey[ED25519_PUBLIC_KEY_SIZE], const uint8_t *message, size_t messageSize,
                        const uint8_t signature[ED25519_SIGNATURE_SIZE]);
+    static void secureWipe(void *value, size_t size);
 };
 
 } // namespace friendmesh::security

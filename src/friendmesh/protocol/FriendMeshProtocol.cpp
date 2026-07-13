@@ -18,6 +18,21 @@ static bool allZero(const uint8_t *value, size_t size)
     return combined == 0;
 }
 
+int32_t eventTypeValue(const friendmesh_FriendMeshSignedFields &fields)
+{
+    static_assert(sizeof(fields.event_type) == sizeof(int32_t), "Unexpected FriendMesh event enum size");
+    int32_t value = 0;
+    std::memcpy(&value, &fields.event_type, sizeof(value));
+    return value;
+}
+
+bool isKnownEventType(const friendmesh_FriendMeshSignedFields &fields)
+{
+    const int32_t value = eventTypeValue(fields);
+    return value > friendmesh_FriendMeshEventType_FRIENDMESH_EVENT_UNSPECIFIED &&
+           value <= friendmesh_FriendMeshEventType_FRIENDMESH_EVENT_PROTOCOL_PROBE;
+}
+
 bool encodeCanonicalSignedFields(const friendmesh_FriendMeshSignedFields &fields, uint8_t *output, size_t outputCapacity,
                                  size_t &outputSize)
 {
@@ -102,16 +117,16 @@ ValidationResult validateEnvelope(const friendmesh_FriendMeshEnvelope &envelope,
                                   SignatureVerifyFn verifySignature, FriendMeshReplayWindow &replayWindow)
 {
     const auto &fields = envelope.signed_fields;
-    if (!envelope.has_signed_fields || fields.sender_node == 0 || fields.sender_sequence == 0 || fields.created_at == 0 ||
-        allZero(fields.event_id, sizeof(fields.event_id)) || allZero(fields.signing_public_key, sizeof(fields.signing_public_key)) ||
-        !verifySignature) {
+    if (!envelope.has_signed_fields || fields.group_epoch == 0 || fields.sender_node == 0 ||
+        fields.sender_sequence == 0 || fields.created_at == 0 || allZero(fields.group_id, sizeof(fields.group_id)) ||
+        allZero(fields.event_id, sizeof(fields.event_id)) ||
+        allZero(fields.signing_public_key, sizeof(fields.signing_public_key)) || !verifySignature) {
         return ValidationResult::MALFORMED;
     }
     if (fields.protocol_version != FRIENDMESH_PROTOCOL_VERSION) {
         return ValidationResult::UNSUPPORTED_VERSION;
     }
-    if (fields.event_type <= friendmesh_FriendMeshEventType_FRIENDMESH_EVENT_UNSPECIFIED ||
-        fields.event_type > friendmesh_FriendMeshEventType_FRIENDMESH_EVENT_PROTOCOL_PROBE) {
+    if (!isKnownEventType(fields)) {
         return ValidationResult::UNKNOWN_EVENT_TYPE;
     }
     if (context.requireSender && fields.sender_node != context.senderNode) {

@@ -1181,8 +1181,10 @@ Build:
 - [x] Implement domain-separated canonical encoding and ESP32-S3 Ed25519 primitives with a fail-closed boot self-test.
 - [x] Define and validate the signing-identity binding to the sender node and current Meshtastic X25519 public key.
 - [x] Implement bounded RAM replay cache, sender sequences, event IDs, signature verification, timestamp bounds, unknown-version/type rejection, and deterministic host checks.
+- [x] Implement bounded outbound canonical frame construction with injectable signing and fail-closed error results; production radio transmission remains disabled without a protected identity.
+- [x] Define the authenticated-encrypted signing-identity storage interface and lifecycle states; reject plaintext/unauthenticated stores and wipe RAM key material on lock/destruction.
 - [ ] Persist the signing seed and durable replay state through the reviewed Phase 3 encrypted-storage boundary.
-- [ ] Implement the signed transmit path and prove two-FriendMesh-device exchange.
+- [ ] Connect the protected identity to the radio send path and prove two-FriendMesh-device exchange.
 
 Design:
 
@@ -1196,9 +1198,9 @@ Tests/gate:
 - [x] Published RFC 8032 crypto vector passes independently; firmware embeds its own known-answer self-test.
 - [x] Invalid-signature, replayed, stale-sequence, stale/future-time, wrong-sender, wrong-group, and wrong-epoch events are rejected by the host protocol checker.
 - [x] Canonical frame round trips, unknown fields, unknown versions/types, maximum payload, and replay-capacity exhaustion are covered.
-- [ ] Fuzz protobuf decoding and bounds.
+- [x] Run 150,000 deterministic random/mutated decoder cases under host undefined-behavior and bounds sanitizers; this found and fixed unsafe reads of unknown Nanopb enum values.
 - [ ] Confirm the firmware crypto self-test and receiver-ready log on physical T-Deck hardware.
-- [ ] Confirm stock Meshtastic traffic remains unaffected after this Phase 2 build.
+- [x] Confirm the previously working T-Deck/Meshtastic behavior remains unaffected after the Phase 2 application upload; operator reported it still works on 2026-07-12.
 
 Implementation contract: [`docs/friendmesh/PHASE2_PROTOCOL_CONTRACT.md`](docs/friendmesh/PHASE2_PROTOCOL_CONTRACT.md). Phase 2 remains open until the identity UI/persistence, fuzzing, transmit exchange, physical regression, and theme/input gates pass.
 
