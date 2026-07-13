@@ -376,6 +376,8 @@ class TFTView_320x240 : public MeshtasticView
     static void ui_event_packet_log(lv_event_t *e);
 #if defined(FRIENDMESHOS_TDECK)
     static void ui_event_friendmesh_diagnostics(lv_event_t *e);
+    static void ui_event_friendmesh_kdf_benchmark(lv_event_t *e);
+    static void ui_event_friendmesh_key_slot_test(lv_event_t *e);
     static void ui_event_friendmesh_diagnostics_back(lv_event_t *e);
     static void ui_event_friendmesh_diagnostics_detail(lv_event_t *e);
     static void ui_event_friendmesh_diagnostics_detail_back(lv_event_t *e);
@@ -423,6 +425,10 @@ class TFTView_320x240 : public MeshtasticView
     lv_obj_t *friendMeshDiagnosticsTopPanel = nullptr;
     lv_obj_t *friendMeshDiagnosticsLabel = nullptr;
     lv_obj_t *friendMeshDiagnosticsDetailButton = nullptr;
+    lv_obj_t *friendMeshKdfBenchmarkButton = nullptr;
+    lv_obj_t *friendMeshKdfBenchmarkButtonLabel = nullptr;
+    lv_obj_t *friendMeshKeySlotTestButton = nullptr;
+    lv_obj_t *friendMeshKeySlotTestButtonLabel = nullptr;
     lv_obj_t *friendMeshDiagnosticsBackButton = nullptr;
     lv_obj_t *friendMeshDiagnosticDetailPanel = nullptr;
     lv_obj_t *friendMeshDiagnosticDetailTopPanel = nullptr;

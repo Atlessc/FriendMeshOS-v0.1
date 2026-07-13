@@ -73,7 +73,7 @@ The first approved FriendMesh release is withheld until all required systems are
 - Meetup proposals, voting, attendance, Emergency Rally Point, and markers.
 - SOS and non-emergency Help Requests.
 - Membership removal, key rotation, offline rekey, admin succession, disbanding, and group erasure.
-- Mandatory BLE/Meshtastic interoperability regression.
+- Mandatory stock Meshtastic BLE compatibility regression when shared client/configuration boundaries change; active BLE is not a FriendMesh runtime or load-test requirement.
 - Complete six-theme, touch, trackball, keyboard, error-state, and physical-device qualification.
 
 Internal milestones and public source snapshots may be incomplete. No incomplete build is described as safe, production-ready, private, or suitable for emergency reliance.
@@ -89,6 +89,8 @@ FriendMeshOS continues to:
 - Keep FriendMesh-owned channels readable but protected from edit/delete through stock admin clients, with a deliberate advanced recovery unlock.
 
 FriendMesh group chat and structured group events are not ordinary Meshtastic text. Every group participant needs FriendMeshOS to interpret them.
+
+BLE is an inherited Meshtastic client/configuration transport only. FriendMesh features do not use BLE and do not require a phone app. The product owner does not plan to keep a phone connected during FriendMesh operation, so simultaneous BLE load is excluded from FriendMesh performance, KDF, storage, radio, and release acceptance gates. Ordinary Meshtastic BLE behavior is still preserved on a best-effort compatibility basis and is regression-tested when FriendMesh or upstream work touches shared PhoneAPI, StreamAPI, protobuf, configuration, or client-session boundaries.
 
 ### Privacy boundary
 
@@ -112,7 +114,7 @@ Use one `t-deck-tft` build with runtime capability detection.
 | Magnetometer | Optional; absence never blocks progress or release of north-up navigation |
 | microSD | Optional; expands history, drafts, contacts, notification center, maps, breadcrumbs, incident logs, and personal markers |
 | Offline map tiles | Optional SD capability; arrow-only navigation remains available |
-| BLE phone connection | Must remain compatible; no FriendMesh phone-app dependency |
+| BLE phone connection | Optional inherited Meshtastic configuration/client path; no FriendMesh dependency or simultaneous-load gate |
 
 Physical validation must record original T-Deck and T-Deck Plus results separately even when the same firmware image is used.
 
@@ -1029,12 +1031,12 @@ Never display PSK bytes.
 - The single FriendMesh carrier slot remains present in ordinary channel configuration.
 - Stock clients may read metadata needed for compatibility.
 - Edit/delete attempts receive a clear protected-channel error.
-- BLE synchronization and all unrelated Meshtastic configuration continue working.
+- BLE synchronization and unrelated Meshtastic configuration are not intentionally changed; retest them whenever shared client/configuration boundaries change.
 - Advanced FriendMesh recovery screen can temporarily unlock a channel after PIN and two-step warning.
 - Unlock displays that security guarantees and local metadata can break.
 - Reconciliation flow detects stock-client changes and offers repair, rebind, or explicit destructive removal.
 
-Test with current supported Meshtastic phone clients before every release. FriendMesh must not depend on modifying those apps.
+Test stock phone compatibility before release when the release changes a shared BLE/client/configuration boundary. FriendMesh must not depend on an active phone connection or modifications to stock apps.
 
 ---
 
@@ -1213,7 +1215,12 @@ Build:
 - [ ] Device storage key, PIN protection, subkey derivation, AEAD records.
 - [x] Freeze XChaCha20-Poly1305 record framing, authenticated header, bounded decoder, and random-nonce rule.
 - [x] Implement the injected-key record codec and ESP32-S3 libsodium adapter without creating a production key store.
-- [ ] Physically benchmark Argon2id and freeze persisted KDF parameters, wrapped-master-key format, and domain contexts.
+- [x] Implement an explicit, non-secret, asynchronous physical Argon2id benchmark with bounded candidate sizes and diagnostic/export results.
+- [x] Physically benchmark the bounded Argon2id candidate set and capture timing, heap, PSRAM, task-stack, and radio-activity evidence.
+- [x] Freeze and implement the versioned 108-byte wrapped-master-key framing, device-binding AAD contract, bounded pre-KDF validation, and ten fixed storage-domain context/subkey IDs with deterministic host rejection checks.
+- [x] Implement backend-independent two-slot wrapped-key generation selection and the internal LittleFS/SafeFile slot backend without enabling runtime key creation.
+- [x] Add an operator-triggered D-01 key-slot recovery self-test using fixed non-secret material and isolated diagnostic paths with mandatory cleanup; production key paths remain untouched.
+- [ ] Freeze final persisted KDF parameters after transactional wrap recovery and normal UI/radio coexistence validation.
 - [ ] Internal essential store and SD storage provider.
 - [ ] Append-only journal, snapshots, index, compaction, schema migration, transaction recovery.
 - [ ] Capacity accounting and fallback.
@@ -1229,8 +1236,12 @@ Design:
 
 Tests/gate:
 
-- [x] Host record checks cover round trip, wrong key, every byte mutation, all truncations, and context mismatch under UB/bounds sanitizers.
+- [x] Host checks cover record and wrapped-key round trips, wrong key/PIN/binding, every-byte mutation, every truncation, excessive-cost rejection before KDF, context mismatch, and stable pairwise-distinct storage subkeys under UB/bounds sanitizers.
+- [x] Fault-injected host checks cover empty slots, alternating generations, partial writes, corrupt readback, wrong PIN, stale generations, peer-slot I/O failure, and same-generation divergent-key quarantine.
+- [x] Build the isolated asynchronous D-01 physical-provider self-test for initial commit, alternating generation, corrupt-old-slot recovery, degraded-state reporting, and test-file cleanup outside the TFT task's `spiLock`-held callback.
+- [x] Physically run and export the corrected isolated D-01 provider test: 5172 ms, generation 2, mask `0x02`, degraded recovery, cleanup pass, and no reboot.
 - [x] Run the XChaCha known-answer self-test on physical T-Deck hardware.
+- [ ] Physically validate LittleFS wrapped-key creation, rewrap, corrupt-slot, reboot, and interrupted-write recovery with a non-production test key.
 - [ ] Power cut at every transaction boundary.
 - [ ] SD removal/full/corrupt/read-only.
 - [ ] Nonce uniqueness across reboot.
@@ -1535,7 +1546,7 @@ Design:
 
 Tests/gate:
 
-- Stable Meshtastic device, stock phone clients, public/private normal channels, PKI DMs, NodeDB, telemetry, GPS, traceroute, BLE reconnect.
+- Stable Meshtastic device, public/private normal channels, PKI DMs, NodeDB, telemetry, GPS, and traceroute. Add stock-phone BLE reconnect/configuration whenever shared client boundaries changed.
 - FriendMesh frames relay but do not render on stock clients.
 - Critical public SOS fallback renders as text.
 
@@ -1592,7 +1603,7 @@ Minimum meaningful qualification fixture:
 - Development FriendMeshOS T-Deck.
 - At least two additional FriendMeshOS T-Deck-class devices for group/ACK/rekey/SOS.
 - Stable untouched Meshtastic comparison node.
-- Stock phone client over BLE.
+- Optional stock phone client over BLE for compatibility regression when shared client/configuration boundaries changed.
 - Optional relay/router to force multi-hop paths.
 - SD present/absent/full/corrupt cases.
 - GPS present/absent/stale cases.
@@ -1609,7 +1620,7 @@ Required campaigns:
 - Congested LongFast and slower presets.
 - Eight groups and eight members per group.
 - Public Meshtastic simultaneous traffic.
-- BLE reconnect/config attempts.
+- Conditional stock BLE reconnect/config attempts; not a simultaneous FriendMesh workload requirement.
 - All six themes and all three input methods.
 
 ---

@@ -95,6 +95,55 @@ bool FriendMeshStorageCrypto::randomNonce(uint8_t nonce[STORAGE_NONCE_SIZE]) con
 #endif
 }
 
+bool FriendMeshStorageCrypto::deriveWrappingKey(const uint8_t *credential, size_t credentialSize,
+                                                const uint8_t salt[STORAGE_KDF_SALT_SIZE], uint32_t operations,
+                                                uint32_t memoryKiB, uint8_t output[STORAGE_KEY_SIZE]) const
+{
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
+    if (!credential || credentialSize == 0 || credentialSize > STORAGE_CREDENTIAL_MAX_SIZE || !salt || !output ||
+        operations < STORAGE_KDF_OPERATIONS_MIN || operations > STORAGE_KDF_OPERATIONS_MAX ||
+        memoryKiB < STORAGE_KDF_MEMORY_MIN_KIB || memoryKiB > STORAGE_KDF_MEMORY_MAX_KIB || !available()) {
+        return false;
+    }
+    const int result = crypto_pwhash(output, STORAGE_KEY_SIZE, reinterpret_cast<const char *>(credential),
+                                     credentialSize, salt, operations, static_cast<size_t>(memoryKiB) * 1024U,
+                                     crypto_pwhash_ALG_ARGON2ID13);
+    if (result != 0) {
+        sodium_memzero(output, STORAGE_KEY_SIZE);
+    }
+    return result == 0;
+#else
+    (void)credential;
+    (void)credentialSize;
+    (void)salt;
+    (void)operations;
+    (void)memoryKiB;
+    (void)output;
+    return false;
+#endif
+}
+
+bool FriendMeshStorageCrypto::deriveStorageSubkey(const uint8_t masterKey[STORAGE_KEY_SIZE], uint64_t subkeyId,
+                                                  const char context[8], uint8_t output[STORAGE_KEY_SIZE]) const
+{
+#if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)
+    if (!masterKey || !context || !output || !available()) {
+        return false;
+    }
+    const int result = crypto_kdf_derive_from_key(output, STORAGE_KEY_SIZE, subkeyId, context, masterKey);
+    if (result != 0) {
+        sodium_memzero(output, STORAGE_KEY_SIZE);
+    }
+    return result == 0;
+#else
+    (void)masterKey;
+    (void)subkeyId;
+    (void)context;
+    (void)output;
+    return false;
+#endif
+}
+
 bool FriendMeshStorageCrypto::selfTest() const
 {
 #if defined(ARCH_ESP32) || defined(ARDUINO_ARCH_ESP32)

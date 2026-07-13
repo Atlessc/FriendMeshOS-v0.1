@@ -16,6 +16,8 @@
 #include "FSCommon.h"
 #include "friendmesh/FriendMeshStatus.h"
 #include "friendmesh/observability/DiagnosticFormatter.h"
+#include "friendmesh/storage/FriendMeshKdfBenchmark.h"
+#include "friendmesh/storage/FriendMeshKeySlotSelfTest.h"
 #include "graphics/view/TFT/FriendMeshBranding.h"
 #include "mesh/Throttle.h"
 #endif
@@ -851,6 +853,20 @@ void TFTView_320x240::createFriendMeshDiagnostics(void)
     lv_label_set_long_mode(friendMeshDiagnosticsLabel, LV_LABEL_LONG_WRAP);
     lv_label_set_text(friendMeshDiagnosticsLabel, "No diagnostic events yet");
 
+    friendMeshKdfBenchmarkButton = lv_btn_create(friendMeshDiagnosticsPanel);
+    lv_obj_set_size(friendMeshKdfBenchmarkButton, LV_PCT(95), 30);
+    add_style_settings_button_style(friendMeshKdfBenchmarkButton);
+    friendMeshKdfBenchmarkButtonLabel = lv_label_create(friendMeshKdfBenchmarkButton);
+    lv_obj_center(friendMeshKdfBenchmarkButtonLabel);
+    lv_label_set_text(friendMeshKdfBenchmarkButtonLabel, "Run KDF Benchmark");
+
+    friendMeshKeySlotTestButton = lv_btn_create(friendMeshDiagnosticsPanel);
+    lv_obj_set_size(friendMeshKeySlotTestButton, LV_PCT(95), 30);
+    add_style_settings_button_style(friendMeshKeySlotTestButton);
+    friendMeshKeySlotTestButtonLabel = lv_label_create(friendMeshKeySlotTestButton);
+    lv_obj_center(friendMeshKeySlotTestButtonLabel);
+    lv_label_set_text(friendMeshKeySlotTestButtonLabel, "Run TEST Slot Recovery");
+
     friendMeshDiagnosticsDetailButton = lv_btn_create(friendMeshDiagnosticsPanel);
     lv_obj_set_size(friendMeshDiagnosticsDetailButton, LV_PCT(95), 30);
     add_style_settings_button_style(friendMeshDiagnosticsDetailButton);
@@ -1054,6 +1070,40 @@ bool TFTView_320x240::exportFriendMeshDiagnostics(char *path, size_t pathSize)
     file.println(static_cast<unsigned long>(FSCom.usedBytes()));
     file.print("internal_fs_total=");
     file.println(static_cast<unsigned long>(FSCom.totalBytes()));
+    const auto benchmark = friendmesh::storage::kdfBenchmarkSnapshot();
+    file.print("kdf_benchmark_state=");
+    file.println(friendmesh::storage::kdfBenchmarkStateName(benchmark.state));
+    file.print("kdf_benchmark_completed=");
+    file.println(static_cast<unsigned>(benchmark.completed));
+    file.print("kdf_task_stack_low_water=");
+    file.println(static_cast<unsigned long>(benchmark.taskStackLowWater));
+    for (size_t index = 0; index < benchmark.completed; ++index) {
+        file.print("kdf_case_");
+        file.print(static_cast<unsigned>(index + 1));
+        file.print('=');
+        file.print(static_cast<unsigned long>(benchmark.results[index].memoryKiB));
+        file.print("KiB,");
+        file.print(static_cast<unsigned long>(benchmark.results[index].operations));
+        file.print("ops,");
+        file.print(static_cast<unsigned long>(benchmark.results[index].durationMs));
+        file.print("ms,");
+        file.println(benchmark.results[index].passed ? "PASS" : "FAIL");
+    }
+    const auto slotTest = friendmesh::storage::keySlotSelfTestSnapshot();
+    file.print("key_slot_self_test_state=");
+    file.println(friendmesh::storage::keySlotSelfTestStateName(slotTest.state));
+    file.print("key_slot_self_test_failed_step=");
+    file.println(friendmesh::storage::keySlotSelfTestStepName(slotTest.failedStep));
+    file.print("key_slot_self_test_duration_ms=");
+    file.println(static_cast<unsigned long>(slotTest.durationMs));
+    file.print("key_slot_self_test_generation=");
+    file.println(static_cast<unsigned long>(slotTest.selectedGeneration));
+    file.print("key_slot_self_test_valid_mask=");
+    file.println(static_cast<unsigned>(slotTest.validMask));
+    file.print("key_slot_self_test_degraded_recovery=");
+    file.println(slotTest.degradedRecovery ? "true" : "false");
+    file.print("key_slot_self_test_cleanup=");
+    file.println(slotTest.cleanupPassed ? "PASS" : "FAIL");
 #endif
     file.println();
 
@@ -1138,6 +1188,43 @@ void TFTView_320x240::refreshFriendMeshDiagnostics(void)
            static_cast<unsigned long>(ESP.getMaxAllocPsram()));
     append("FLASH %lu/%lu USED\n\n", static_cast<unsigned long>(FSCom.usedBytes()),
            static_cast<unsigned long>(FSCom.totalBytes()));
+    const auto benchmark = friendmesh::storage::kdfBenchmarkSnapshot();
+    append("KDF %s %u/%u\n", friendmesh::storage::kdfBenchmarkStateName(benchmark.state),
+           static_cast<unsigned>(benchmark.completed), static_cast<unsigned>(friendmesh::storage::KDF_BENCHMARK_CASE_COUNT));
+    if (benchmark.taskStackLowWater > 0) {
+        append("KDF STACK LOW %lu\n", static_cast<unsigned long>(benchmark.taskStackLowWater));
+    }
+    for (size_t index = 0; index < benchmark.completed; ++index) {
+        append("K%u %luK x%lu %lums %s\n", static_cast<unsigned>(index + 1),
+               static_cast<unsigned long>(benchmark.results[index].memoryKiB),
+               static_cast<unsigned long>(benchmark.results[index].operations),
+               static_cast<unsigned long>(benchmark.results[index].durationMs),
+               benchmark.results[index].passed ? "PASS" : "FAIL");
+    }
+    const auto slotTest = friendmesh::storage::keySlotSelfTestSnapshot();
+    append("SLOT TEST %s %lums\n", friendmesh::storage::keySlotSelfTestStateName(slotTest.state),
+           static_cast<unsigned long>(slotTest.durationMs));
+    if (slotTest.state == friendmesh::storage::KeySlotSelfTestState::PASSED) {
+        append("GEN %lu MASK %02x DEGRADED %s CLEAN %s\n", static_cast<unsigned long>(slotTest.selectedGeneration),
+               static_cast<unsigned>(slotTest.validMask), slotTest.degradedRecovery ? "YES" : "NO",
+               slotTest.cleanupPassed ? "PASS" : "FAIL");
+    } else if (slotTest.state == friendmesh::storage::KeySlotSelfTestState::FAILED) {
+        append("FAILED %s CLEAN %s\n", friendmesh::storage::keySlotSelfTestStepName(slotTest.failedStep),
+               slotTest.cleanupPassed ? "PASS" : "FAIL");
+    }
+    append("\n");
+    lv_label_set_text(friendMeshKdfBenchmarkButtonLabel,
+                      benchmark.state == friendmesh::storage::KdfBenchmarkState::RUNNING ? "Benchmark Running..."
+                                                                                         : "Run KDF Benchmark");
+    lv_obj_set_state(friendMeshKdfBenchmarkButton, LV_STATE_DISABLED,
+                     benchmark.state == friendmesh::storage::KdfBenchmarkState::RUNNING);
+    lv_label_set_text(friendMeshKeySlotTestButtonLabel,
+                      slotTest.state == friendmesh::storage::KeySlotSelfTestState::RUNNING
+                          ? "Slot Test Running..."
+                          : "Run TEST Slot Recovery");
+    lv_obj_set_state(friendMeshKeySlotTestButton, LV_STATE_DISABLED,
+                     benchmark.state == friendmesh::storage::KdfBenchmarkState::RUNNING ||
+                         slotTest.state == friendmesh::storage::KeySlotSelfTestState::RUNNING);
 #endif
 
     const size_t visible = std::min<size_t>(8, visibleCount);
@@ -1404,6 +1491,8 @@ void TFTView_320x240::ui_events_init(void)
     lv_obj_add_event_cb(objects.tools_packet_log_button, ui_event_packet_log, LV_EVENT_ALL, 0);
 #if defined(FRIENDMESHOS_TDECK)
     lv_obj_add_event_cb(friendMeshDiagnosticsButton, ui_event_friendmesh_diagnostics, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshKdfBenchmarkButton, ui_event_friendmesh_kdf_benchmark, LV_EVENT_CLICKED, 0);
+    lv_obj_add_event_cb(friendMeshKeySlotTestButton, ui_event_friendmesh_key_slot_test, LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(friendMeshDiagnosticsDetailButton, ui_event_friendmesh_diagnostics_detail, LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(friendMeshDiagnosticsBackButton, ui_event_friendmesh_diagnostics_back, LV_EVENT_CLICKED, 0);
     lv_obj_add_event_cb(friendMeshDiagnosticDetailBackButton, ui_event_friendmesh_diagnostics_detail_back, LV_EVENT_CLICKED, 0);
@@ -3543,6 +3632,22 @@ void TFTView_320x240::ui_event_friendmesh_diagnostics(lv_event_t *e)
         THIS->refreshFriendMeshDiagnostics();
         THIS->ui_set_active(objects.settings_button, THIS->friendMeshDiagnosticsPanel,
                             THIS->friendMeshDiagnosticsTopPanel);
+    }
+}
+
+void TFTView_320x240::ui_event_friendmesh_kdf_benchmark(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        friendmesh::storage::startKdfBenchmark();
+        THIS->refreshFriendMeshDiagnostics();
+    }
+}
+
+void TFTView_320x240::ui_event_friendmesh_key_slot_test(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        friendmesh::storage::runKeySlotSelfTest();
+        THIS->refreshFriendMeshDiagnostics();
     }
 }
 

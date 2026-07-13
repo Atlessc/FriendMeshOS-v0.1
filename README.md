@@ -40,6 +40,22 @@ for the complete friends/groups execution tracker, and
 [branding/TDECK_STYLING.md](branding/TDECK_STYLING.md) for the active visual
 contract and known unfinished styling work.
 
+## Bluetooth scope
+
+FriendMeshOS does not depend on BLE for FriendMesh groups, chat, history,
+location sharing, navigation, or alerts. Those features are designed to run on
+the T-Deck and communicate over the Meshtastic LoRa mesh. BLE remains inherited
+Meshtastic functionality for connecting a stock phone client to configure or
+use the underlying Meshtastic device.
+
+The product owner does not plan to operate FriendMeshOS with an active BLE
+phone connection. Therefore simultaneous BLE-plus-FriendMesh load is not a
+FriendMesh feature acceptance gate. FriendMeshOS must still avoid intentionally
+breaking ordinary Meshtastic BLE pairing, configuration, and reconnect behavior
+when shared upstream boundaries change. That compatibility regression is a
+documented gap until tested; it is not evidence about FriendMesh security or
+radio operation.
+
 ## Themes
 
 FriendMeshOS currently includes six T-Deck themes.
@@ -199,7 +215,8 @@ following have passed physical regression testing:
 - Screenshot capture on every screen
 - SD-card behavior
 - GPS behavior
-- Bluetooth behavior
+- Stock Meshtastic Bluetooth pairing/configuration behavior (compatibility
+  regression only; not a FriendMesh runtime dependency)
 - LoRa behavior
 - Phone interoperability
 - Maps and offline map tiles

@@ -198,7 +198,7 @@ Selected themes:
 - [x] Preserve GPS and node-position reception.
 - [x] Preserve MUI touchscreen and keyboard functionality.
 - [ ] Preserve channels, direct messages, encryption, NodeDB, and acknowledgments.
-- [ ] Preserve Bluetooth phone connectivity in normal mesh mode.
+- [ ] Preserve stock Bluetooth pairing/configuration when shared Meshtastic client boundaries change; active BLE is not a FriendMesh runtime requirement.
 - [ ] Preserve Wi-Fi client/MQTT functionality when survey mode is inactive.
 - [ ] Preserve traceroute, range test, telemetry, and packet statistics.
 - [ ] Avoid changing the Meshtastic air protocol unless a feature truly requires it.
@@ -861,18 +861,124 @@ Use this session handoff template beneath the milestone log:
 
 ## Milestone log
 
+### 2026-07-12 — D-01 slot-test `spiLock` deadlock diagnosed and corrected
+
+- Status: ROOT CAUSE CONFIRMED; ASYNCHRONOUS CORRECTION BUILT AND PHYSICALLY PASSED
+- Branch / HEAD: `develop` / `8765b54` plus uncommitted Phase 3 changes
+- Roadmap item(s): physical LittleFS provider test, TFT responsiveness, lock ordering, watchdog safety, and secret/configuration isolation
+- Files changed: `FriendMeshKeySlotSelfTest.cpp`, Phase 3 design/game plan, risk register, and roadmap
+- Commands run: source trace through `tft_task_handler`, the LVGL event callback, `FriendMeshInternalKeySlots`, `SafeFile`, and `concurrency::Lock`; `bash bin/check-friendmesh-storage.sh`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
+- Build/test result: sanitizer-backed storage framing checks passed; the corrected T-Deck release build passed in 85.21 seconds at RAM 38.3% (125612/327680) and app flash 57.8% (3785161/6553600); corrected application SHA-256 is `85de0f64cfa442f467373a183cc8b1016e927e9f08a15bf085f45da4ca36952d`
+- Hardware result: pressing `Run TEST Slot Recovery` on the prior build froze the system for approximately one minute and the device then rebooted. The supplied capture begins during the subsequent normal boot and contains no decoded reset reason or panic text. After normal-uploading the corrected build, the operator exported `diagnostics_1783920625_00.txt`; it proves `PASS` in 5172 ms with failed step `NONE`, generation 2, authenticated-slot mask `0x02`, degraded recovery `true`, and cleanup `PASS`, with no repeat reboot.
+- Root cause: `tft_task_handler` holds the non-recursive global `spiLock` across `deviceScreen->task_handler()`, including LVGL event callbacks. The original synchronous D-01 callback called `clearSlots()`, which attempted to acquire that already-held lock with `portMAX_DELAY`; it could never advance. The corrected callback starts a low-priority 12 KiB worker on CPU 1 and returns, allowing the TFT task to release `spiLock` before the worker accesses LittleFS. Result snapshots are protected by a critical-section mux, and worker-creation failure reports `TASK_START` rather than blocking.
+- Safety result: the deadlock occurred on the first `clearSlots()` lock acquisition, before any test-path filesystem call. No diagnostic record was created, corrupted, or removed, and the production `/friendmesh/keys` paths were never supplied to the test.
+- Resource result: the passing export recorded internal heap 161184/245392 bytes free, 137428-byte boot low-water, and a 139252-byte largest block; PSRAM 2900267/8385975 bytes free, 2885567-byte low-water, and a 2883572-byte largest block; internal LittleFS use was 73728/3538944 bytes. The 5172 ms physical duration supersedes the earlier sub-three-second estimate.
+- Known issues: the missing pre-reset reason means the prior reboot's exact watchdog class is not directly decoded even though the lock cycle is deterministic in source. The isolated provider path is now physically evidenced, but explicit UI-input responsiveness during the worker, simultaneous radio traffic, reboot/interrupted-write recovery, PIN rewrap, production binding, and the broader FriendMesh UI callback/lock-order audit remain open as RSK-044.
+- Next action: retain the passing D-01 export as the provider baseline, verify ordinary messaging/configuration after the test, then implement separate non-production interrupted-write, PIN rewrap, and reboot-recovery gates before production identity persistence.
+
+### 2026-07-12 — D-01 isolated LittleFS key-slot recovery test implemented
+
+- Status: SUPERSEDED BY THE ASYNCHRONOUS CORRECTION ABOVE; ORIGINAL PHYSICAL EXECUTION DEADLOCKED
+- Branch / HEAD: `develop` / `8765b54` plus uncommitted Phase 3 changes
+- Roadmap item(s): physical-provider validation without production identity persistence or Meshtastic configuration changes
+- Files changed: `FriendMeshInternalKeySlots.*`, `FriendMeshKeySlotSelfTest.*`, D-01 UI/export integration, Phase 3 design/game plan, decision/risk logs, and roadmap
+- Commands run: `bash bin/check-friendmesh-storage.sh`; `git diff --check`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`
+- Build/test result: sanitizer-backed host suite passed; the full T-Deck release build passed in 183.23 seconds and final incremental verification passed in 84.37 seconds at RAM 38.3% (125612/327680) and app flash 57.7% (3784613/6553600); final application SHA-256 is `0be4d37bd27ab84d5bf88aa485a130467548ee3eb18e342d81c36b527ad89036`
+- Hardware result: the operator normal-uploaded the application without `uploadfs`; PlatformIO followed the ESP32-S3 from `/dev/cu.usbmodem806599BB8F8C1` to its temporary `/dev/cu.usbmodem1101` bootloader port, wrote and hash-verified all application segments, and completed successfully in 83.87 seconds. Existing filesystem/configuration storage was not uploaded or erased. The isolated provider test still requires the operator-triggered `Run TEST Slot Recovery` action on D-01.
+- Decisions made: physical provider validation uses fixed non-secret credentials/key/binding, minimum bounded KDF cost, and only `/friendmesh/diagnostics/keyslot_test_a.bin` plus `keyslot_test_b.bin`. It commits generations one and two, authenticates both, overwrites the old slot with corrupt test bytes, requires degraded recovery from generation two, then removes both slots and `.tmp` files. Production `/friendmesh/keys` paths are never supplied to this action. D-01 and exports retain result metadata only.
+- Known issues: this one-tap test does not simulate power loss or prove reboot recovery. It has not yet run on physical LittleFS, so slot creation, cleanup, UI responsiveness, and exported results remain unverified. Production identity storage, stable device binding, PIN UI, interrupted-write/reboot campaigns, and the general transaction journal remain gated.
+- Next action: superseded by the corrected-build retest procedure in the milestone above.
+
+### 2026-07-12 — Transactional internal wrapped-key slots implemented
+
+- Status: HOST RECOVERY MODEL AND DORMANT LITTLEFS BACKEND COMPLETE; PHYSICAL RECOVERY GATE OPEN
+- Branch / HEAD: `develop` / `8765b54` plus uncommitted Phase 3 changes
+- Roadmap item(s): internal transactional wrapped-key provider, last-known-good recovery, stale/conflicting generation rejection, and interrupted-write host campaign
+- Files changed: `FriendMeshWrappedKeyStore.*`, `FriendMeshInternalKeySlots.*`, `FriendMeshMasterKey.*`, storage host harness, Phase 3 design/game plan, decision/risk logs, and roadmap
+- Commands run: `bash bin/check-friendmesh-storage.sh`; `git diff --check`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`
+- Build/test result: sanitizer-backed host suite passed; T-Deck release build passed in 175.92 seconds at RAM 38.3% (125588/327680) and app flash 57.7% (3778577/6553600); application SHA-256 is `ae51a5fc2ee5d11803599d432954c1faeef0d5015109b7086c4a9b1c5e9e4b92`
+- Hardware result: no device mutation or flash. The LittleFS backend compiled but is not called, so it cannot create `/friendmesh/keys` or alter current Meshtastic configuration.
+- Decisions made: alternate two fixed internal slots; write only the inactive slot; require exact readback; authenticate both slots during unlock; select the highest valid generation; expose single-slot recovery as degraded; reject stale prepared generations before writing; quarantine authenticated equal-generation records that unwrap to different master keys.
+- Known issues: host fault injection is not evidence of ESP32 LittleFS power-loss behavior. The stable device binding, provisioning/PIN UI, physical slot/reboot/corruption campaign, general transaction journal, and production signing identity remain gated. A reported write failure can be ambiguous after real power loss, so startup recovery must always authenticate both slots before retrying.
+- Next action: add a non-production D-01 storage-slot test action and export fields, then physically validate slot creation, rewrap, corruption recovery, and reboot behavior without enabling production identity persistence.
+
+### 2026-07-12 — Phase 3 wrapped master key and storage-domain contract implemented
+
+- Status: FORMAT AND HOST REJECTION GATE COMPLETE; PRODUCTION KEY CREATION REMAINS DISABLED
+- Branch / HEAD: `develop` / `8765b54` plus uncommitted Phase 3 changes
+- Roadmap item(s): versioned wrapped-master-key framing, device-binding AAD, bounded persisted KDF parameters, and fixed local-storage subkeys
+- Files changed: `src/friendmesh/storage/FriendMeshMasterKey.*`, `FriendMeshStorageCrypto.*`, storage host harness, Phase 3 design/game plan, decision/risk logs, and roadmap
+- Commands run: `bash bin/check-friendmesh-storage.sh`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`; `trunk fmt` attempted but unavailable in the shell
+- Build/test result: host framing/rejection checks passed under UB/bounds sanitizers; T-Deck release build passed in 178.28 seconds at RAM 38.3% (125588/327680) and app flash 57.7% (3778577/6553600); application SHA-256 is `5d8b22625151baefdda9bfa299eebc9d0a286ddd46dce1d3e085877a17388533`; final `git diff --check` passed
+- Hardware result: no hardware mutation or flash. Prior physical Argon2id timing and XChaCha self-test evidence remain applicable, but the new wrap/provider recovery path is not connected to runtime storage yet.
+- Decisions made: freeze a 108-byte `FMWK` v1 record; authenticate its 60-byte header plus a nonserialized 16-byte device binding; reject KDF costs outside 8..2048 KiB and 1..6 operations before Argon2id; freeze ten domain IDs/contexts; keep 1024 KiB/3 operations provisional; keep signing identity `STORAGE_UNAVAILABLE` and TX disabled.
+- Known issues: the stable device-binding source, random master-key provisioning, transactional dual-slot persistence, PIN UI, recovery, and power-cut behavior are not implemented. The host vector freezes framing with deterministic test primitives rather than serving as an independent libsodium KAT. The required `trunk` formatter is not installed in this environment, so `trunk fmt` could not run.
+- Next action: implement the internal transactional wrapped-key slot/provider and a deterministic interrupted-write recovery harness before generating any production signing identity.
+
+### 2026-07-12 — BLE scope clarified as inherited Meshtastic compatibility only
+
+- Status: PRODUCT BOUNDARY APPROVED AND DOCUMENTED
+- Branch / HEAD: `develop` / `8765b54` plus uncommitted Phase 3 changes
+- Roadmap item(s): BLE dependency boundary, conditional stock-client regression, and explicit simultaneous-load evidence gap
+- Files changed: README, game plan, Phase 3 design, decision log, and roadmap
+- Commands run: cross-document BLE reference audit; `git diff --check`
+- Build/test result: documentation-only scope clarification; no firmware behavior changed
+- Hardware result: no new BLE test. A prior stock Meshtastic phone connection/configuration test passed, but simultaneous BLE plus FriendMesh/KDF/storage load has not been tested.
+- Decisions made: FriendMesh does not use BLE and requires no phone connection. The intended operating mode has no active BLE client, so simultaneous BLE load is removed from FriendMesh performance/KDF/storage acceptance gates. Stock Meshtastic BLE remains a compatibility boundary and is conditionally retested whenever shared client/configuration code changes.
+- Known issues: inherited BLE compatibility can still regress through future upstream or shared PhoneAPI/StreamAPI/protobuf/configuration changes; the project must not describe simultaneous BLE operation as verified.
+- Next action: proceed with the versioned wrapped-master-key and domain-separated subkey implementation without blocking on an irrelevant active-BLE load test.
+
+### 2026-07-12 — Corrected physical Argon2id benchmark passed
+
+- Status: PHYSICAL CANDIDATE BENCHMARK PASSED; 1 MIB/3 OPS LEADS BUT REMAINS PROVISIONAL
+- Branch / HEAD: `develop` / `8765b54` plus uncommitted Phase 3 benchmark changes
+- Roadmap item(s): bounded Argon2id timing, watchdog correction, allocation/headroom evidence, task-stack sizing, diagnostic export, and radio coexistence observation
+- Files changed: Phase 3 design/game plan/roadmap and benchmark task stack reserve
+- Commands run: inspected `/Volumes/MESHMAP/friendmesh/diagnostics_1783915729_00.txt` and the two operator D-01 screenshots
+- Build/test result: `t-deck-tft` build with the 12 KiB worker stack passed in 85.38 seconds at RAM 38.3% (125588/327680) and app flash 57.6% (3776917/6553600); application SHA-256 is `bacc6b67348bcc672771b6207473784c0466c0e0ac7eb5633ae5148141ed6f00`; `git diff --check` passed
+- Hardware result: all five corrected cases passed: 256 KiB/1 op in 296 ms, 512 KiB/1 op in 266 ms, 1024 KiB/1 op in 493 ms, 1024 KiB/2 ops in 679 ms, and 1024 KiB/3 ops in 1089 ms. Export reported heap 162436/245512 free, 126860 low-water, and 131060 largest block; PSRAM 2900275/8385975 free, 1851619 low-water, and 2883572 largest block. The diagnostic session retained decoded LoRa position/telemetry events while the benchmark completed.
+- Decisions made: 1024 KiB/3 ops is the leading v1 candidate at approximately 1.1 seconds, but remains provisional until UI/radio coexistence and wrapped-key recovery are tested. The 8 KiB benchmark task retained only 588 bytes, so the dedicated worker reserve is increased to 12 KiB. DEC-050 excludes active BLE from this acceptance gate.
+- Known issues: only one corrected physical run is recorded; stack headroom must be remeasured after the 12 KiB change; final wrapped-key parameters and recovery format are not frozen. Simultaneous BLE was not tested and is outside the approved FriendMesh operating profile.
+- Next action: build the 12 KiB-stack correction, then implement the versioned wrapped-master-key header and domain-separated subkey contract around provisional 1024 KiB/3-op parameters.
+
+### 2026-07-12 — Physical Argon2id watchdog reset diagnosed and benchmark corrected
+
+- Status: FAILURE REPRODUCED ON HARDWARE; ROOT CAUSE SUPPORTED BY LOG/SDK CONFIG; CORRECTED BUILD PASSED AND AWAITS PHYSICAL RETEST
+- Branch / HEAD: `develop` / `8765b54` plus uncommitted Phase 3 benchmark changes
+- Roadmap item(s): physical Argon2id watchdog behavior, task isolation, stack headroom, and diagnostic evidence
+- Files changed: `FriendMeshKdfBenchmark`, D-01/export stack telemetry, Phase 3 design, and roadmap
+- Commands run: inspected the operator serial log, the live benchmark task, and the ESP32-S3 SDK task-watchdog configuration
+- Build/test result: `t-deck-tft` build passed in 95.66 seconds at RAM 38.3% (125588/327680) and app flash 57.6% (3776913/6553600)
+- Hardware result: pressing the benchmark caused the T-Deck USB serial device to disconnect and the firmware to boot fresh. The captured stream contains no completed KDF case or decoded panic, but the live SDK enables a five-second panic watchdog for CPU 0's idle task and the benchmark was pinned to CPU 0 at priority 1 around a monolithic Argon2 call.
+- Decisions made: never run the benchmark above idle priority on watched CPU 0. The corrected task uses CPU 1 at idle priority, an 8 KiB stack, a pre-case serial marker, a short delay between cases, and retained task-stack low-water telemetry.
+- Known issues: physical retest is required; the missing panic text means watchdog starvation is strongly supported rather than directly decoded from a backtrace. Allocation placement, per-case latency, UI/radio/BLE coexistence, and final KDF parameters remain unverified.
+- Next action: build the corrected application, then perform one monitored physical benchmark retest without `uploadfs`.
+
+### 2026-07-12 — Explicit physical Argon2id benchmark ready
+
+- Status: IMPLEMENTED AND BUILT; PHYSICAL TIMING/HEADROOM RESULTS REQUIRED BEFORE KDF PARAMETERS ARE FROZEN
+- Branch / HEAD: `develop` / `8765b54` plus uncommitted benchmark changes
+- Roadmap item(s): physical Argon2id tuning, bounded memory/pass candidates, nonblocking UI execution, diagnostic/export evidence, and no production key creation before measurement
+- Files changed: `FriendMeshKdfBenchmark`, T-Deck D-01 button/status/export integration, Phase 3 design/game plan, and roadmap
+- Commands run: `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
+- Build/test result: clean `t-deck-tft` build passed in 202.10 seconds at RAM 38.3% (125588/327680) and app flash 57.6% (3776585/6553600); application SHA-256 is `1cc2a725d35756a0e9563a548de849f88d1648b6cb3f3298b850957126b6d4ea`
+- Hardware result: not run for the benchmark build
+- Decisions made: benchmark is never automatic; the operator starts it from D-01. It runs on a low-priority ESP32 task with fixed non-secret input, tries 256 KiB/one pass, 512 KiB/one pass, then 1 MiB/one, two, and three passes, wipes each 32-byte output, and creates no storage key/PIN record. D-01 and exports retain success/duration results plus memory low-water evidence.
+- Known issues: physical responsiveness, radio/BLE coexistence, watchdog behavior, allocation success, timing, and post-run fragmentation are unknown until tested; no KDF parameter is approved merely because the benchmark compiles
+- Next action: normal application upload, run the D-01 KDF benchmark once while monitoring serial, capture all five result lines and post-run memory rows, then select or adjust candidates from measured evidence
+
 ### 2026-07-12 — D-01 live heap, PSRAM, fragmentation, and flash telemetry
 
-- Status: IMPLEMENTED, HOST-CHECKED, AND BUILT; PHYSICAL DISPLAY/EXPORT CHECK REMAINS
+- Status: IMPLEMENTED, HOST-CHECKED, BUILT, PHYSICALLY DISPLAYED, AND EXPORT FIELDS CONFIRMED
 - Branch / HEAD: `develop` / `5eee555` plus uncommitted Phase 3 changes
 - Roadmap item(s): one-second storage/resource status, over-utilization evidence, low-water tracking, fragmentation visibility, and retained diagnostic export snapshot
 - Files changed: T-Deck diagnostics view/header, Phase 3 game plan/design contract, and roadmap
 - Commands run: `bin/check-friendmesh-storage.sh`; `$HOME/.platformio/penv/bin/pio run -e t-deck-tft`; `git diff --check`
 - Build/test result: `t-deck-tft` build passed in 93.80 seconds at RAM 38.3% (125492/327680) and app flash 57.5% (3767405/6553600); application SHA-256 is `46aa9ac6e0934c414a5fc934282dd6f12a5927cccf0fe26a0262641f786305a0`
-- Hardware result: not run for this telemetry addition
+- Hardware result: operator screenshot confirms D-01 renders the identity/TX/AEAD state plus internal heap, PSRAM, low-water, largest-block, internal-filesystem, and retained-event rows. Observed values were heap 161692/245592 free with 134412 low-water and 139252 largest block; PSRAM 2900283/8385975 free with 2885583 low-water and 2883572 largest block; internal filesystem 57344/3538944 used. The displayed snapshot shows healthy internal headroom and negligible PSRAM fragmentation at capture time.
 - Decisions made: D-01 reports current/total, boot low-water, and largest contiguous allocation for internal heap and PSRAM, plus internal filesystem used/total; values refresh once per second only while diagnostics is open; exports capture the same snapshot without adding periodic records or radio traffic
-- Known issues: telemetry does not yet classify thresholds as warning/critical; physical layout, scrolling, live value changes, and exported fields require confirmation
-- Next action: normal application upload, open D-01, confirm all resource rows render and update, then export diagnostics and inspect the ten resource fields
+- Known issues: telemetry does not yet classify thresholds as warning/critical; simultaneous BLE load has not been captured
+- Next action: retain this telemetry through wrapped-key and persistence work, then repeat the resource check during active BLE and storage transactions
 
 ### 2026-07-12 — Phase 3 authenticated encrypted-storage foundation activated
 
